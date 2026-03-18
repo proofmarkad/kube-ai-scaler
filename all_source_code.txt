@@ -1,0 +1,4903 @@
+====================================================================================================
+SOURCE CODE CONSOLIDATION
+Generated: 2026-03-18 13:58:36
+Root: /home/sanjay/work/go/kube-scaling-agent
+Files: 53
+====================================================================================================
+
+================================================================================
+FILE: .golangci.yml
+SIZE: 826.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+version: "2"
+run:
+  allow-parallel-runners: true
+linters:
+  default: none
+  enable:
+    - copyloopvar
+    - dupl
+    - errcheck
+    - ginkgolinter
+    - goconst
+    - gocyclo
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - prealloc
+    - revive
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+  settings:
+    revive:
+      rules:
+        - name: comment-spacings
+        - name: import-shadowing
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - lll
+        path: api/*
+      - linters:
+          - dupl
+          - lll
+        path: internal/*
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+
+
+================================================================================
+FILE: README.md
+SIZE: 3.7 KB
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+# kube-scaling-agent
+// TODO(user): Add simple overview of use/purpose
+
+## Description
+// TODO(user): An in-depth paragraph about your project and overview of use
+
+## Getting Started
+
+### Prerequisites
+- go version v1.24.6+
+- docker version 17.03+.
+- kubectl version v1.11.3+.
+- Access to a Kubernetes v1.11.3+ cluster.
+
+### To Deploy on the cluster
+**Build and push your image to the location specified by `IMG`:**
+
+```sh
+make docker-build docker-push IMG=<some-registry>/kube-scaling-agent:tag
+```
+
+**NOTE:** This image ought to be published in the personal registry you specified.
+And it is required to have access to pull the image from the working environment.
+Make sure you have the proper permission to the registry if the above commands don’t work.
+
+**Install the CRDs into the cluster:**
+
+```sh
+make install
+```
+
+**Deploy the Manager to the cluster with the image specified by `IMG`:**
+
+```sh
+make deploy IMG=<some-registry>/kube-scaling-agent:tag
+```
+
+> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
+privileges or be logged in as admin.
+
+**Create instances of your solution**
+You can apply the samples (examples) from the config/sample:
+
+```sh
+kubectl apply -k config/samples/
+```
+
+>**NOTE**: Ensure that the samples has default values to test it out.
+
+### To Uninstall
+**Delete the instances (CRs) from the cluster:**
+
+```sh
+kubectl delete -k config/samples/
+```
+
+**Delete the APIs(CRDs) from the cluster:**
+
+```sh
+make uninstall
+```
+
+**UnDeploy the controller from the cluster:**
+
+```sh
+make undeploy
+```
+
+## Project Distribution
+
+Following the options to release and provide this solution to the users.
+
+### By providing a bundle with all YAML files
+
+1. Build the installer for the image built and published in the registry:
+
+```sh
+make build-installer IMG=<some-registry>/kube-scaling-agent:tag
+```
+
+**NOTE:** The makefile target mentioned above generates an 'install.yaml'
+file in the dist directory. This file contains all the resources built
+with Kustomize, which are necessary to install this project without its
+dependencies.
+
+2. Using the installer
+
+Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
+the project, i.e.:
+
+```sh
+kubectl apply -f https://raw.githubusercontent.com/<org>/kube-scaling-agent/<tag or branch>/dist/install.yaml
+```
+
+### By providing a Helm Chart
+
+1. Build the chart using the optional helm plugin
+
+```sh
+kubebuilder edit --plugins=helm/v2-alpha
+```
+
+2. See that a chart was generated under 'dist/chart', and users
+can obtain this solution from there.
+
+**NOTE:** If you change the project, you need to update the Helm Chart
+using the same command above to sync the latest changes. Furthermore,
+if you create webhooks, you need to use the above command with
+the '--force' flag and manually ensure that any custom configuration
+previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
+is manually re-applied afterwards.
+
+## Contributing
+// TODO(user): Add detailed information on how you would like others to contribute to this project
+
+**NOTE:** Run `make help` for more information on all potential `make` targets
+
+More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+
+## License
+
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+
+
+================================================================================
+FILE: api/v1/aiscaler_types.go
+SIZE: 4.8 KB
+LAST MODIFIED: 2026-03-17 13:53:16
+================================================================================
+
+/*
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package v1
+
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// +kubebuilder:validation:Enum=anthropic;gemini;ollama;deepseek
+type LLMProvider string
+
+const (
+	ProviderAnthropic LLMProvider = "anthropic"
+	ProviderGemini    LLMProvider = "gemini"
+	ProviderOllama    LLMProvider = "ollama"
+	ProviderDeepseek  LLMProvider = "deepseek"
+)
+
+type ScalingPhase string
+
+const (
+	PhaseInitializing ScalingPhase = "Initializing"
+	PhaseObserving    ScalingPhase = "Observing"
+	PhaseScaling      ScalingPhase = "Scaling"
+	PhaseCoolingDown  ScalingPhase = "CoolingDown"
+	PhaseFailed       ScalingPhase = "Failed"
+)
+
+const (
+	ConditionReady        = "Ready"
+	ConditionSignalsReady = "SignalsReady"
+	ConditionLLMReady     = "LLMReady"
+	ConditionScaling      = "Scaling"
+)
+
+type TargetRef struct {
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace"`
+}
+
+type ScalingConstraints struct {
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	MinReplicas int32 `json:"minReplicas"`
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=10
+	MaxReplicas int32 `json:"maxReplicas"`
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=3
+	MaxScaleStep int32 `json:"maxScaleStep"`
+}
+
+type SecretRef struct {
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace"`
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+}
+
+type LLMConfig struct {
+	// +kubebuilder:validation:Required
+	Primary LLMProvider `json:"primary"`
+	// +optional
+	Fallback *LLMProvider `json:"fallback,omitempty"`
+	// +optional
+	Model string `json:"model,omitempty"`
+	// +optional
+	APIKeySecret *SecretRef `json:"apiKeySecret,omitempty"`
+	// +kubebuilder:default="http://localhost:11434"
+	// +optional
+	OllamaBaseURL string `json:"ollamaBaseURL,omitempty"`
+}
+
+type PrometheusConfig struct {
+	// +kubebuilder:validation:Required
+	BaseURL string `json:"baseURL"`
+	// +optional
+	P95LatencyQuery string `json:"p95LatencyQuery,omitempty"`
+	// +optional
+	ErrorRateQuery string `json:"errorRateQuery,omitempty"`
+}
+
+type AIScalerSpec struct {
+	// +kubebuilder:validation:Required
+	TargetRef TargetRef `json:"targetRef"`
+	// +kubebuilder:validation:Required
+	Constraints ScalingConstraints `json:"constraints"`
+	// +kubebuilder:validation:Required
+	LLM LLMConfig `json:"llm"`
+	// +kubebuilder:validation:Required
+	Prometheus PrometheusConfig `json:"prometheus"`
+	// +kubebuilder:default="60s"
+	// +optional
+	EvaluationInterval metav1.Duration `json:"evaluationInterval,omitempty"`
+	// +kubebuilder:default="300s"
+	// +optional
+	CooldownPeriod metav1.Duration `json:"cooldownPeriod,omitempty"`
+	// +kubebuilder:default=false
+	// +optional
+	DryRun bool `json:"dryRun,omitempty"`
+}
+
+type AIScalerStatus struct {
+	// +optional
+	Phase ScalingPhase `json:"phase,omitempty"`
+	// +optional
+	CurrentReplicas int32 `json:"currentReplicas,omitempty"`
+	// +optional
+	DesiredReplicas int32 `json:"desiredReplicas,omitempty"`
+	// +optional
+	LastScaleTime *metav1.Time `json:"lastScaleTime,omitempty"`
+	// +optional
+	LastDecisionReason string `json:"lastDecisionReason,omitempty"`
+	// +optional
+	LastProvider LLMProvider `json:"lastProvider,omitempty"`
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster,shortName=ais
+// +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="Current",type=integer,JSONPath=`.status.currentReplicas`
+// +kubebuilder:printcolumn:name="Desired",type=integer,JSONPath=`.status.desiredReplicas`
+// +kubebuilder:printcolumn:name="Provider",type=string,JSONPath=`.status.lastProvider`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+type AIScaler struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              AIScalerSpec   `json:"spec,omitempty"`
+	Status            AIScalerStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+type AIScalerList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []AIScaler `json:"items"`
+}
+
+func init() {
+	SchemeBuilder.Register(&AIScaler{}, &AIScalerList{})
+}
+
+
+================================================================================
+FILE: api/v1/groupversion_info.go
+SIZE: 1.2 KB
+LAST MODIFIED: 2026-03-16 18:26:54
+================================================================================
+
+/*
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// Package v1 contains API Schema definitions for the aiscaler v1 API group.
+// +kubebuilder:object:generate=true
+// +groupName=aiscaler.aiscaler.io
+package v1
+
+import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/scheme"
+)
+
+var (
+	// GroupVersion is group version used to register these objects.
+	GroupVersion = schema.GroupVersion{Group: "aiscaler.aiscaler.io", Version: "v1"}
+
+	// SchemeBuilder is used to add go types to the GroupVersionKind scheme.
+	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
+
+	// AddToScheme adds the types in this group-version to the given scheme.
+	AddToScheme = SchemeBuilder.AddToScheme
+)
+
+
+================================================================================
+FILE: api/v1/zz_generated.deepcopy.go
+SIZE: 6.1 KB
+LAST MODIFIED: 2026-03-17 13:57:56
+================================================================================
+
+//go:build !ignore_autogenerated
+
+/*
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// Code generated by controller-gen. DO NOT EDIT.
+
+package v1
+
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+)
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *AIScaler) DeepCopyInto(out *AIScaler) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new AIScaler.
+func (in *AIScaler) DeepCopy() *AIScaler {
+	if in == nil {
+		return nil
+	}
+	out := new(AIScaler)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (in *AIScaler) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *AIScalerList) DeepCopyInto(out *AIScalerList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]AIScaler, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new AIScalerList.
+func (in *AIScalerList) DeepCopy() *AIScalerList {
+	if in == nil {
+		return nil
+	}
+	out := new(AIScalerList)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (in *AIScalerList) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *AIScalerSpec) DeepCopyInto(out *AIScalerSpec) {
+	*out = *in
+	out.TargetRef = in.TargetRef
+	out.Constraints = in.Constraints
+	in.LLM.DeepCopyInto(&out.LLM)
+	out.Prometheus = in.Prometheus
+	out.EvaluationInterval = in.EvaluationInterval
+	out.CooldownPeriod = in.CooldownPeriod
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new AIScalerSpec.
+func (in *AIScalerSpec) DeepCopy() *AIScalerSpec {
+	if in == nil {
+		return nil
+	}
+	out := new(AIScalerSpec)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *AIScalerStatus) DeepCopyInto(out *AIScalerStatus) {
+	*out = *in
+	if in.LastScaleTime != nil {
+		in, out := &in.LastScaleTime, &out.LastScaleTime
+		*out = (*in).DeepCopy()
+	}
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]metav1.Condition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new AIScalerStatus.
+func (in *AIScalerStatus) DeepCopy() *AIScalerStatus {
+	if in == nil {
+		return nil
+	}
+	out := new(AIScalerStatus)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *LLMConfig) DeepCopyInto(out *LLMConfig) {
+	*out = *in
+	if in.Fallback != nil {
+		in, out := &in.Fallback, &out.Fallback
+		*out = new(LLMProvider)
+		**out = **in
+	}
+	if in.APIKeySecret != nil {
+		in, out := &in.APIKeySecret, &out.APIKeySecret
+		*out = new(SecretRef)
+		**out = **in
+	}
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new LLMConfig.
+func (in *LLMConfig) DeepCopy() *LLMConfig {
+	if in == nil {
+		return nil
+	}
+	out := new(LLMConfig)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *PrometheusConfig) DeepCopyInto(out *PrometheusConfig) {
+	*out = *in
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new PrometheusConfig.
+func (in *PrometheusConfig) DeepCopy() *PrometheusConfig {
+	if in == nil {
+		return nil
+	}
+	out := new(PrometheusConfig)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ScalingConstraints) DeepCopyInto(out *ScalingConstraints) {
+	*out = *in
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ScalingConstraints.
+func (in *ScalingConstraints) DeepCopy() *ScalingConstraints {
+	if in == nil {
+		return nil
+	}
+	out := new(ScalingConstraints)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *SecretRef) DeepCopyInto(out *SecretRef) {
+	*out = *in
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new SecretRef.
+func (in *SecretRef) DeepCopy() *SecretRef {
+	if in == nil {
+		return nil
+	}
+	out := new(SecretRef)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *TargetRef) DeepCopyInto(out *TargetRef) {
+	*out = *in
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new TargetRef.
+func (in *TargetRef) DeepCopy() *TargetRef {
+	if in == nil {
+		return nil
+	}
+	out := new(TargetRef)
+	in.DeepCopyInto(out)
+	return out
+}
+
+
+================================================================================
+FILE: cmd/main.go
+SIZE: 8.9 KB
+LAST MODIFIED: 2026-03-18 12:12:51
+================================================================================
+
+/*
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package main
+
+import (
+	"crypto/tls"
+	"flag"
+	"os"
+
+	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
+	// to ensure that exec-entrypoint and run can make use of them.
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	aiscalerv1 "github.com/sanjbh/kube-scaling-agent/api/v1"
+	"github.com/sanjbh/kube-scaling-agent/internal/actuator"
+	"github.com/sanjbh/kube-scaling-agent/internal/config"
+	"github.com/sanjbh/kube-scaling-agent/internal/controller"
+	"github.com/sanjbh/kube-scaling-agent/internal/decision"
+	"github.com/sanjbh/kube-scaling-agent/internal/llm"
+	"github.com/sanjbh/kube-scaling-agent/internal/signals"
+	// +kubebuilder:scaffold:imports
+)
+
+var (
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
+)
+
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
+	utilruntime.Must(aiscalerv1.AddToScheme(scheme))
+	// +kubebuilder:scaffold:scheme
+}
+
+// nolint:gocyclo
+func main() {
+	var metricsAddr string
+	var metricsCertPath, metricsCertName, metricsCertKey string
+	var webhookCertPath, webhookCertName, webhookCertKey string
+	var enableLeaderElection bool
+	var probeAddr string
+	var secureMetrics bool
+	var enableHTTP2 bool
+	var tlsOpts []func(*tls.Config)
+	var configPath string
+
+	flag.StringVar(&configPath, "config", "config/operator.yaml", "The path to the operator config file.")
+	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
+		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
+		"Enable leader election for controller manager. "+
+			"Enabling this will ensure there is only one active controller manager.")
+	flag.BoolVar(&secureMetrics, "metrics-secure", true,
+		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
+	flag.StringVar(&webhookCertPath, "webhook-cert-path", "", "The directory that contains the webhook certificate.")
+	flag.StringVar(&webhookCertName, "webhook-cert-name", "tls.crt", "The name of the webhook certificate file.")
+	flag.StringVar(&webhookCertKey, "webhook-cert-key", "tls.key", "The name of the webhook key file.")
+	flag.StringVar(&metricsCertPath, "metrics-cert-path", "",
+		"The directory that contains the metrics server certificate.")
+	flag.StringVar(&metricsCertName, "metrics-cert-name", "tls.crt", "The name of the metrics server certificate file.")
+	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
+	flag.BoolVar(&enableHTTP2, "enable-http2", false,
+		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	opts := zap.Options{
+		Development: true,
+	}
+	opts.BindFlags(flag.CommandLine)
+	flag.Parse()
+
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// if the enable-http2 flag is false (the default), http/2 should be disabled
+	// due to its vulnerabilities. More specifically, disabling http/2 will
+	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
+	// Rapid Reset CVEs. For more information see:
+	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
+	// - https://github.com/advisories/GHSA-4374-p667-p6c8
+	disableHTTP2 := func(c *tls.Config) {
+		setupLog.Info("disabling http/2")
+		c.NextProtos = []string{"http/1.1"}
+	}
+
+	if !enableHTTP2 {
+		tlsOpts = append(tlsOpts, disableHTTP2)
+	}
+
+	// Initial webhook TLS options
+	webhookTLSOpts := tlsOpts
+	webhookServerOptions := webhook.Options{
+		TLSOpts: webhookTLSOpts,
+	}
+
+	if len(webhookCertPath) > 0 {
+		setupLog.Info("Initializing webhook certificate watcher using provided certificates",
+			"webhook-cert-path", webhookCertPath, "webhook-cert-name", webhookCertName, "webhook-cert-key", webhookCertKey)
+
+		webhookServerOptions.CertDir = webhookCertPath
+		webhookServerOptions.CertName = webhookCertName
+		webhookServerOptions.KeyName = webhookCertKey
+	}
+
+	webhookServer := webhook.NewServer(webhookServerOptions)
+
+	// Metrics endpoint is enabled in 'config/default/kustomization.yaml'. The Metrics options configure the server.
+	// More info:
+	// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.4/pkg/metrics/server
+	// - https://book.kubebuilder.io/reference/metrics.html
+	metricsServerOptions := metricsserver.Options{
+		BindAddress:   metricsAddr,
+		SecureServing: secureMetrics,
+		TLSOpts:       tlsOpts,
+	}
+
+	if secureMetrics {
+		// FilterProvider is used to protect the metrics endpoint with authn/authz.
+		// These configurations ensure that only authorized users and service accounts
+		// can access the metrics endpoint. The RBAC are configured in 'config/rbac/kustomization.yaml'. More info:
+		// https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.4/pkg/metrics/filters#WithAuthenticationAndAuthorization
+		metricsServerOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
+	}
+
+	// If the certificate is not specified, controller-runtime will automatically
+	// generate self-signed certificates for the metrics server. While convenient for development and testing,
+	// this setup is not recommended for production.
+	//
+	// TODO(user): If you enable certManager, uncomment the following lines:
+	// - [METRICS-WITH-CERTS] at config/default/kustomization.yaml to generate and use certificates
+	// managed by cert-manager for the metrics server.
+	// - [PROMETHEUS-WITH-CERTS] at config/prometheus/kustomization.yaml for TLS certification.
+	if len(metricsCertPath) > 0 {
+		setupLog.Info("Initializing metrics certificate watcher using provided certificates",
+			"metrics-cert-path", metricsCertPath, "metrics-cert-name", metricsCertName, "metrics-cert-key", metricsCertKey)
+
+		metricsServerOptions.CertDir = metricsCertPath
+		metricsServerOptions.CertName = metricsCertName
+		metricsServerOptions.KeyName = metricsCertKey
+	}
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme:                 scheme,
+		Metrics:                metricsServerOptions,
+		WebhookServer:          webhookServer,
+		HealthProbeBindAddress: probeAddr,
+		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "bb7278d0.aiscaler.io",
+		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
+		// when the Manager ends. This requires the binary to immediately end when the
+		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
+		// speeds up voluntary leader transitions as the new leader don't have to wait
+		// LeaseDuration time first.
+		//
+		// In the default scaffold provided, the program ends immediately after
+		// the manager stops, so would be fine to enable this option. However,
+		// if you are doing or is intended to do any operation such as perform cleanups
+		// after the manager stops then its usage might be unsafe.
+		// LeaderElectionReleaseOnCancel: true,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	// Load central config
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		setupLog.Error(err,
+			"unable to load config",
+			"path", configPath,
+		)
+		os.Exit(1)
+	}
+
+	// Wire internal components
+	k8sClient := mgr.GetClient()
+
+	if err := (&controller.AIScalerReconciler{
+		Client:    k8sClient,
+		Scheme:    mgr.GetScheme(),
+		Collector: signals.NewCollector(k8sClient),
+		Router:    llm.NewRouter(cfg),
+		Validator: decision.NewValidator(),
+		Actuator:  actuator.NewActuator(k8sClient),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "AIScaler")
+		os.Exit(1)
+	}
+	// +kubebuilder:scaffold:builder
+
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up health check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
+
+	setupLog.Info("starting manager")
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		setupLog.Error(err, "problem running manager")
+		os.Exit(1)
+	}
+}
+
+
+================================================================================
+FILE: config/crd/bases/aiscaler.aiscaler.io_aiscalers.yaml
+SIZE: 8.2 KB
+LAST MODIFIED: 2026-03-17 13:57:59
+================================================================================
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: aiscalers.aiscaler.aiscaler.io
+spec:
+  group: aiscaler.aiscaler.io
+  names:
+    kind: AIScaler
+    listKind: AIScalerList
+    plural: aiscalers
+    shortNames:
+    - ais
+    singular: aiscaler
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.currentReplicas
+      name: Current
+      type: integer
+    - jsonPath: .status.desiredReplicas
+      name: Desired
+      type: integer
+    - jsonPath: .status.lastProvider
+      name: Provider
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              constraints:
+                properties:
+                  maxReplicas:
+                    default: 10
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  maxScaleStep:
+                    default: 3
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  minReplicas:
+                    default: 1
+                    format: int32
+                    minimum: 1
+                    type: integer
+                required:
+                - maxReplicas
+                - maxScaleStep
+                - minReplicas
+                type: object
+              cooldownPeriod:
+                default: 300s
+                type: string
+              dryRun:
+                default: false
+                type: boolean
+              evaluationInterval:
+                default: 60s
+                type: string
+              llm:
+                properties:
+                  apiKeySecret:
+                    properties:
+                      key:
+                        type: string
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  fallback:
+                    enum:
+                    - anthropic
+                    - gemini
+                    - ollama
+                    - deepseek
+                    type: string
+                  model:
+                    type: string
+                  ollamaBaseURL:
+                    default: http://localhost:11434
+                    type: string
+                  primary:
+                    enum:
+                    - anthropic
+                    - gemini
+                    - ollama
+                    - deepseek
+                    type: string
+                required:
+                - primary
+                type: object
+              prometheus:
+                properties:
+                  baseURL:
+                    type: string
+                  errorRateQuery:
+                    type: string
+                  p95LatencyQuery:
+                    type: string
+                required:
+                - baseURL
+                type: object
+              targetRef:
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                required:
+                - name
+                - namespace
+                type: object
+            required:
+            - constraints
+            - llm
+            - prometheus
+            - targetRef
+            type: object
+          status:
+            properties:
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              currentReplicas:
+                format: int32
+                type: integer
+              desiredReplicas:
+                format: int32
+                type: integer
+              lastDecisionReason:
+                type: string
+              lastProvider:
+                enum:
+                - anthropic
+                - gemini
+                - ollama
+                - deepseek
+                type: string
+              lastScaleTime:
+                format: date-time
+                type: string
+              phase:
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+
+
+================================================================================
+FILE: config/crd/kustomization.yaml
+SIZE: 685.0 B
+LAST MODIFIED: 2026-03-16 18:26:54
+================================================================================
+
+# This kustomization.yaml is not intended to be run by itself,
+# since it depends on service name and namespace that are out of this kustomize package.
+# It should be run by config/default
+resources:
+- bases/aiscaler.aiscaler.io_aiscalers.yaml
+# +kubebuilder:scaffold:crdkustomizeresource
+
+patches:
+# [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
+# patches here are for enabling the conversion webhook for each CRD
+# +kubebuilder:scaffold:crdkustomizewebhookpatch
+
+# [WEBHOOK] To enable webhook, uncomment the following section
+# the following config is for teaching kustomize how to do kustomization for CRDs.
+#configurations:
+#- kustomizeconfig.yaml
+
+
+================================================================================
+FILE: config/crd/kustomizeconfig.yaml
+SIZE: 506.0 B
+LAST MODIFIED: 2026-03-16 18:26:54
+================================================================================
+
+# This file is for teaching kustomize how to substitute name and namespace reference in CRD
+nameReference:
+- kind: Service
+  version: v1
+  fieldSpecs:
+  - kind: CustomResourceDefinition
+    version: v1
+    group: apiextensions.k8s.io
+    path: spec/conversion/webhook/clientConfig/service/name
+
+namespace:
+- kind: CustomResourceDefinition
+  version: v1
+  group: apiextensions.k8s.io
+  path: spec/conversion/webhook/clientConfig/service/namespace
+  create: false
+
+varReference:
+- path: metadata/annotations
+
+
+================================================================================
+FILE: config/default/cert_metrics_manager_patch.yaml
+SIZE: 870.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+# This patch adds the args, volumes, and ports to allow the manager to use the metrics-server certs.
+
+# Add the volumeMount for the metrics-server certs
+- op: add
+  path: /spec/template/spec/containers/0/volumeMounts/-
+  value:
+    mountPath: /tmp/k8s-metrics-server/metrics-certs
+    name: metrics-certs
+    readOnly: true
+
+# Add the --metrics-cert-path argument for the metrics server
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --metrics-cert-path=/tmp/k8s-metrics-server/metrics-certs
+
+# Add the metrics-server certs volume configuration
+- op: add
+  path: /spec/template/spec/volumes/-
+  value:
+    name: metrics-certs
+    secret:
+      secretName: metrics-server-cert
+      optional: false
+      items:
+        - key: ca.crt
+          path: ca.crt
+        - key: tls.crt
+          path: tls.crt
+        - key: tls.key
+          path: tls.key
+
+
+================================================================================
+FILE: config/default/kustomization.yaml
+SIZE: 7.4 KB
+LAST MODIFIED: 2026-03-16 18:26:54
+================================================================================
+
+# Adds namespace to all resources.
+namespace: kube-scaling-agent-system
+
+# Value of this field is prepended to the
+# names of all resources, e.g. a deployment named
+# "wordpress" becomes "alices-wordpress".
+# Note that it should also match with the prefix (text before '-') of the namespace
+# field above.
+namePrefix: kube-scaling-agent-
+
+# Labels to add to all resources and selectors.
+#labels:
+#- includeSelectors: true
+#  pairs:
+#    someName: someValue
+
+resources:
+- ../crd
+- ../rbac
+- ../manager
+# [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix including the one in
+# crd/kustomization.yaml
+#- ../webhook
+# [CERTMANAGER] To enable cert-manager, uncomment all sections with 'CERTMANAGER'. 'WEBHOOK' components are required.
+#- ../certmanager
+# [PROMETHEUS] To enable prometheus monitor, uncomment all sections with 'PROMETHEUS'.
+#- ../prometheus
+# [METRICS] Expose the controller manager metrics service.
+- metrics_service.yaml
+# [NETWORK POLICY] Protect the /metrics endpoint and Webhook Server with NetworkPolicy.
+# Only Pod(s) running a namespace labeled with 'metrics: enabled' will be able to gather the metrics.
+# Only CR(s) which requires webhooks and are applied on namespaces labeled with 'webhooks: enabled' will
+# be able to communicate with the Webhook Server.
+#- ../network-policy
+
+# Uncomment the patches line if you enable Metrics
+patches:
+# [METRICS] The following patch will enable the metrics endpoint using HTTPS and the port :8443.
+# More info: https://book.kubebuilder.io/reference/metrics
+- path: manager_metrics_patch.yaml
+  target:
+    kind: Deployment
+
+# Uncomment the patches line if you enable Metrics and CertManager
+# [METRICS-WITH-CERTS] To enable metrics protected with certManager, uncomment the following line.
+# This patch will protect the metrics with certManager self-signed certs.
+#- path: cert_metrics_manager_patch.yaml
+#  target:
+#    kind: Deployment
+
+# [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix including the one in
+# crd/kustomization.yaml
+#- path: manager_webhook_patch.yaml
+#  target:
+#    kind: Deployment
+
+# [CERTMANAGER] To enable cert-manager, uncomment all sections with 'CERTMANAGER' prefix.
+# Uncomment the following replacements to add the cert-manager CA injection annotations
+#replacements:
+# - source: # Uncomment the following block to enable certificates for metrics
+#     kind: Service
+#     version: v1
+#     name: controller-manager-metrics-service
+#     fieldPath: metadata.name
+#   targets:
+#     - select:
+#         kind: Certificate
+#         group: cert-manager.io
+#         version: v1
+#         name: metrics-certs
+#       fieldPaths:
+#         - spec.dnsNames.0
+#         - spec.dnsNames.1
+#       options:
+#         delimiter: '.'
+#         index: 0
+#         create: true
+#     - select: # Uncomment the following to set the Service name for TLS config in Prometheus ServiceMonitor
+#         kind: ServiceMonitor
+#         group: monitoring.coreos.com
+#         version: v1
+#         name: controller-manager-metrics-monitor
+#       fieldPaths:
+#         - spec.endpoints.0.tlsConfig.serverName
+#       options:
+#         delimiter: '.'
+#         index: 0
+#         create: true
+
+# - source:
+#     kind: Service
+#     version: v1
+#     name: controller-manager-metrics-service
+#     fieldPath: metadata.namespace
+#   targets:
+#     - select:
+#         kind: Certificate
+#         group: cert-manager.io
+#         version: v1
+#         name: metrics-certs
+#       fieldPaths:
+#         - spec.dnsNames.0
+#         - spec.dnsNames.1
+#       options:
+#         delimiter: '.'
+#         index: 1
+#         create: true
+#     - select: # Uncomment the following to set the Service namespace for TLS in Prometheus ServiceMonitor
+#         kind: ServiceMonitor
+#         group: monitoring.coreos.com
+#         version: v1
+#         name: controller-manager-metrics-monitor
+#       fieldPaths:
+#         - spec.endpoints.0.tlsConfig.serverName
+#       options:
+#         delimiter: '.'
+#         index: 1
+#         create: true
+
+# - source: # Uncomment the following block if you have any webhook
+#     kind: Service
+#     version: v1
+#     name: webhook-service
+#     fieldPath: .metadata.name # Name of the service
+#   targets:
+#     - select:
+#         kind: Certificate
+#         group: cert-manager.io
+#         version: v1
+#         name: serving-cert
+#       fieldPaths:
+#         - .spec.dnsNames.0
+#         - .spec.dnsNames.1
+#       options:
+#         delimiter: '.'
+#         index: 0
+#         create: true
+# - source:
+#     kind: Service
+#     version: v1
+#     name: webhook-service
+#     fieldPath: .metadata.namespace # Namespace of the service
+#   targets:
+#     - select:
+#         kind: Certificate
+#         group: cert-manager.io
+#         version: v1
+#         name: serving-cert
+#       fieldPaths:
+#         - .spec.dnsNames.0
+#         - .spec.dnsNames.1
+#       options:
+#         delimiter: '.'
+#         index: 1
+#         create: true
+
+# - source: # Uncomment the following block if you have a ValidatingWebhook (--programmatic-validation)
+#     kind: Certificate
+#     group: cert-manager.io
+#     version: v1
+#     name: serving-cert # This name should match the one in certificate.yaml
+#     fieldPath: .metadata.namespace # Namespace of the certificate CR
+#   targets:
+#     - select:
+#         kind: ValidatingWebhookConfiguration
+#       fieldPaths:
+#         - .metadata.annotations.[cert-manager.io/inject-ca-from]
+#       options:
+#         delimiter: '/'
+#         index: 0
+#         create: true
+# - source:
+#     kind: Certificate
+#     group: cert-manager.io
+#     version: v1
+#     name: serving-cert
+#     fieldPath: .metadata.name
+#   targets:
+#     - select:
+#         kind: ValidatingWebhookConfiguration
+#       fieldPaths:
+#         - .metadata.annotations.[cert-manager.io/inject-ca-from]
+#       options:
+#         delimiter: '/'
+#         index: 1
+#         create: true
+
+# - source: # Uncomment the following block if you have a DefaultingWebhook (--defaulting )
+#     kind: Certificate
+#     group: cert-manager.io
+#     version: v1
+#     name: serving-cert
+#     fieldPath: .metadata.namespace # Namespace of the certificate CR
+#   targets:
+#     - select:
+#         kind: MutatingWebhookConfiguration
+#       fieldPaths:
+#         - .metadata.annotations.[cert-manager.io/inject-ca-from]
+#       options:
+#         delimiter: '/'
+#         index: 0
+#         create: true
+# - source:
+#     kind: Certificate
+#     group: cert-manager.io
+#     version: v1
+#     name: serving-cert
+#     fieldPath: .metadata.name
+#   targets:
+#     - select:
+#         kind: MutatingWebhookConfiguration
+#       fieldPaths:
+#         - .metadata.annotations.[cert-manager.io/inject-ca-from]
+#       options:
+#         delimiter: '/'
+#         index: 1
+#         create: true
+
+# - source: # Uncomment the following block if you have a ConversionWebhook (--conversion)
+#     kind: Certificate
+#     group: cert-manager.io
+#     version: v1
+#     name: serving-cert
+#     fieldPath: .metadata.namespace # Namespace of the certificate CR
+#   targets: # Do not remove or uncomment the following scaffold marker; required to generate code for target CRD.
+# +kubebuilder:scaffold:crdkustomizecainjectionns
+# - source:
+#     kind: Certificate
+#     group: cert-manager.io
+#     version: v1
+#     name: serving-cert
+#     fieldPath: .metadata.name
+#   targets: # Do not remove or uncomment the following scaffold marker; required to generate code for target CRD.
+# +kubebuilder:scaffold:crdkustomizecainjectionname
+
+
+================================================================================
+FILE: config/default/manager_metrics_patch.yaml
+SIZE: 174.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+# This patch adds the args to allow exposing the metrics endpoint using HTTPS
+- op: add
+  path: /spec/template/spec/containers/0/args/0
+  value: --metrics-bind-address=:8443
+
+
+================================================================================
+FILE: config/default/metrics_service.yaml
+SIZE: 423.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: kube-scaling-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: controller-manager-metrics-service
+  namespace: system
+spec:
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: 8443
+  selector:
+    control-plane: controller-manager
+    app.kubernetes.io/name: kube-scaling-agent
+
+
+================================================================================
+FILE: config/manager/kustomization.yaml
+SIZE: 26.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+resources:
+- manager.yaml
+
+
+================================================================================
+FILE: config/manager/manager.yaml
+SIZE: 3.1 KB
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: kube-scaling-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: kube-scaling-agent
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/name: kube-scaling-agent
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        control-plane: controller-manager
+        app.kubernetes.io/name: kube-scaling-agent
+    spec:
+      # TODO(user): Uncomment the following code to configure the nodeAffinity expression
+      # according to the platforms which are supported by your solution.
+      # It is considered best practice to support multiple architectures. You can
+      # build your manager image using the makefile target docker-buildx.
+      # affinity:
+      #   nodeAffinity:
+      #     requiredDuringSchedulingIgnoredDuringExecution:
+      #       nodeSelectorTerms:
+      #         - matchExpressions:
+      #           - key: kubernetes.io/arch
+      #             operator: In
+      #             values:
+      #               - amd64
+      #               - arm64
+      #               - ppc64le
+      #               - s390x
+      #           - key: kubernetes.io/os
+      #             operator: In
+      #             values:
+      #               - linux
+      securityContext:
+        # Projects are configured by default to adhere to the "restricted" Pod Security Standards.
+        # This ensures that deployments meet the highest security requirements for Kubernetes.
+        # For more details, see: https://kubernetes.io/docs/concepts/security/pod-security-standards/#restricted
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - command:
+        - /manager
+        args:
+          - --leader-elect
+          - --health-probe-bind-address=:8081
+        image: controller:latest
+        name: manager
+        ports: []
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - "ALL"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        # TODO(user): Configure the resources accordingly based on the project requirements.
+        # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        volumeMounts: []
+      volumes: []
+      serviceAccountName: controller-manager
+      terminationGracePeriodSeconds: 10
+
+
+================================================================================
+FILE: config/network-policy/allow-metrics-traffic.yaml
+SIZE: 849.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+# This NetworkPolicy allows ingress traffic
+# with Pods running on namespaces labeled with 'metrics: enabled'. Only Pods on those
+# namespaces are able to gather data from the metrics endpoint.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-scaling-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: allow-metrics-traffic
+  namespace: system
+spec:
+  podSelector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/name: kube-scaling-agent
+  policyTypes:
+    - Ingress
+  ingress:
+    # This allows ingress traffic from any namespace with the label metrics: enabled
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            metrics: enabled  # Only from namespaces with this label
+      ports:
+        - port: 8443
+          protocol: TCP
+
+
+================================================================================
+FILE: config/network-policy/kustomization.yaml
+SIZE: 40.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+resources:
+- allow-metrics-traffic.yaml
+
+
+================================================================================
+FILE: config/operator.yaml
+SIZE: 695.0 B
+LAST MODIFIED: 2026-03-17 13:53:51
+================================================================================
+
+llm:
+  providers:
+    - name: anthropic
+      baseURL: "https://api.anthropic.com/v1"
+      apiKey: "${ANTHROPIC_API_KEY}"
+      model: "claude-sonnet-4-5"
+
+    - name: gemini
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai"
+      apiKey: "${GEMINI_API_KEY}"
+      model: "gemini-2.0-flash"
+
+    - name: ollama
+      baseURL: "http://localhost:11434/v1"
+      model: "qwen2.5-coder:7b"
+      
+    - name: deepseek
+      baseURL: "https://api.deepseek.com/v1"
+      apiKey: "${DEEPSEEK_API_KEY}"
+      model: "deepseek-chat"
+
+prometheus:
+  baseURL: "http://prometheus:9090"
+
+operator:
+  leaderElection: false
+  metricsBindAddress: ":8080"
+  healthProbeBindAddress: ":8081"
+
+================================================================================
+FILE: config/prometheus/kustomization.yaml
+SIZE: 469.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+resources:
+- monitor.yaml
+
+# [PROMETHEUS-WITH-CERTS] The following patch configures the ServiceMonitor in ../prometheus
+# to securely reference certificates created and managed by cert-manager.
+# Additionally, ensure that you uncomment the [METRICS WITH CERTMANAGER] patch under config/default/kustomization.yaml
+# to mount the "metrics-server-cert" secret in the Manager Deployment.
+#patches:
+#  - path: monitor_tls_patch.yaml
+#    target:
+#      kind: ServiceMonitor
+
+
+================================================================================
+FILE: config/prometheus/monitor.yaml
+SIZE: 1.2 KB
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+# Prometheus Monitor Service (Metrics)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: kube-scaling-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: controller-manager-metrics-monitor
+  namespace: system
+spec:
+  endpoints:
+    - path: /metrics
+      port: https # Ensure this is the name of the port that exposes HTTPS metrics
+      scheme: https
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      tlsConfig:
+        # TODO(user): The option insecureSkipVerify: true is not recommended for production since it disables
+        # certificate verification, exposing the system to potential man-in-the-middle attacks.
+        # For production environments, it is recommended to use cert-manager for automatic TLS certificate management.
+        # To apply this configuration, enable cert-manager and use the patch located at config/prometheus/servicemonitor_tls_patch.yaml,
+        # which securely references the certificate from the 'metrics-server-cert' secret.
+        insecureSkipVerify: true
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/name: kube-scaling-agent
+
+
+================================================================================
+FILE: config/prometheus/monitor_tls_patch.yaml
+SIZE: 553.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+# Patch for Prometheus ServiceMonitor to enable secure TLS configuration
+# using certificates managed by cert-manager
+- op: replace
+  path: /spec/endpoints/0/tlsConfig
+  value:
+    # SERVICE_NAME and SERVICE_NAMESPACE will be substituted by kustomize
+    serverName: SERVICE_NAME.SERVICE_NAMESPACE.svc
+    insecureSkipVerify: false
+    ca:
+      secret:
+        name: metrics-server-cert
+        key: ca.crt
+    cert:
+      secret:
+        name: metrics-server-cert
+        key: tls.crt
+    keySecret:
+      name: metrics-server-cert
+      key: tls.key
+
+
+================================================================================
+FILE: config/rbac/aiscaler_admin_role.yaml
+SIZE: 765.0 B
+LAST MODIFIED: 2026-03-16 18:26:54
+================================================================================
+
+# This rule is not used by the project kube-scaling-agent itself.
+# It is provided to allow the cluster admin to help manage permissions for users.
+#
+# Grants full permissions ('*') over aiscaler.aiscaler.io.
+# This role is intended for users authorized to modify roles and bindings within the cluster,
+# enabling them to delegate specific permissions to other users or groups as needed.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-scaling-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: aiscaler-admin-role
+rules:
+- apiGroups:
+  - aiscaler.aiscaler.io
+  resources:
+  - aiscalers
+  verbs:
+  - '*'
+- apiGroups:
+  - aiscaler.aiscaler.io
+  resources:
+  - aiscalers/status
+  verbs:
+  - get
+
+
+================================================================================
+FILE: config/rbac/aiscaler_editor_role.yaml
+SIZE: 817.0 B
+LAST MODIFIED: 2026-03-16 18:26:54
+================================================================================
+
+# This rule is not used by the project kube-scaling-agent itself.
+# It is provided to allow the cluster admin to help manage permissions for users.
+#
+# Grants permissions to create, update, and delete resources within the aiscaler.aiscaler.io.
+# This role is intended for users who need to manage these resources
+# but should not control RBAC or manage permissions for others.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-scaling-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: aiscaler-editor-role
+rules:
+- apiGroups:
+  - aiscaler.aiscaler.io
+  resources:
+  - aiscalers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - aiscaler.aiscaler.io
+  resources:
+  - aiscalers/status
+  verbs:
+  - get
+
+
+================================================================================
+FILE: config/rbac/aiscaler_viewer_role.yaml
+SIZE: 785.0 B
+LAST MODIFIED: 2026-03-16 18:26:54
+================================================================================
+
+# This rule is not used by the project kube-scaling-agent itself.
+# It is provided to allow the cluster admin to help manage permissions for users.
+#
+# Grants read-only access to aiscaler.aiscaler.io resources.
+# This role is intended for users who need visibility into these resources
+# without permissions to modify them. It is ideal for monitoring purposes and limited-access viewing.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-scaling-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: aiscaler-viewer-role
+rules:
+- apiGroups:
+  - aiscaler.aiscaler.io
+  resources:
+  - aiscalers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - aiscaler.aiscaler.io
+  resources:
+  - aiscalers/status
+  verbs:
+  - get
+
+
+================================================================================
+FILE: config/rbac/kustomization.yaml
+SIZE: 1.2 KB
+LAST MODIFIED: 2026-03-16 18:26:54
+================================================================================
+
+resources:
+# All RBAC will be applied under this service account in
+# the deployment namespace. You may comment out this resource
+# if your manager will use a service account that exists at
+# runtime. Be sure to update RoleBinding and ClusterRoleBinding
+# subjects if changing service account names.
+- service_account.yaml
+- role.yaml
+- role_binding.yaml
+- leader_election_role.yaml
+- leader_election_role_binding.yaml
+# The following RBAC configurations are used to protect
+# the metrics endpoint with authn/authz. These configurations
+# ensure that only authorized users and service accounts
+# can access the metrics endpoint. Comment the following
+# permissions if you want to disable this protection.
+# More info: https://book.kubebuilder.io/reference/metrics.html
+- metrics_auth_role.yaml
+- metrics_auth_role_binding.yaml
+- metrics_reader_role.yaml
+# For each CRD, "Admin", "Editor" and "Viewer" roles are scaffolded by
+# default, aiding admins in cluster management. Those roles are
+# not used by the kube-scaling-agent itself. You can comment the following lines
+# if you do not want those helpers be installed with your Project.
+- aiscaler_admin_role.yaml
+- aiscaler_editor_role.yaml
+- aiscaler_viewer_role.yaml
+
+
+
+================================================================================
+FILE: config/rbac/leader_election_role.yaml
+SIZE: 577.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+# permissions to do leader election.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-scaling-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: leader-election-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+
+
+================================================================================
+FILE: config/rbac/leader_election_role_binding.yaml
+SIZE: 375.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-scaling-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: leader-election-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: controller-manager
+  namespace: system
+
+
+================================================================================
+FILE: config/rbac/metrics_auth_role.yaml
+SIZE: 287.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: metrics-auth-role
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+
+
+================================================================================
+FILE: config/rbac/metrics_auth_role_binding.yaml
+SIZE: 282.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metrics-auth-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metrics-auth-role
+subjects:
+- kind: ServiceAccount
+  name: controller-manager
+  namespace: system
+
+
+================================================================================
+FILE: config/rbac/metrics_reader_role.yaml
+SIZE: 150.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: metrics-reader
+rules:
+- nonResourceURLs:
+  - "/metrics"
+  verbs:
+  - get
+
+
+================================================================================
+FILE: config/rbac/role.yaml
+SIZE: 424.0 B
+LAST MODIFIED: 2026-03-17 13:57:59
+================================================================================
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - aiscaler.io
+  resources:
+  - aiscalers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - aiscaler.io
+  resources:
+  - aiscalers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - aiscaler.io
+  resources:
+  - aiscalers/status
+  verbs:
+  - get
+  - patch
+  - update
+
+
+================================================================================
+FILE: config/rbac/role_binding.yaml
+SIZE: 373.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-scaling-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: manager-role
+subjects:
+- kind: ServiceAccount
+  name: controller-manager
+  namespace: system
+
+
+================================================================================
+FILE: config/rbac/service_account.yaml
+SIZE: 194.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-scaling-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: controller-manager
+  namespace: system
+
+
+================================================================================
+FILE: config/samples/aiscaler_v1_aiscaler.yaml
+SIZE: 224.0 B
+LAST MODIFIED: 2026-03-16 18:26:54
+================================================================================
+
+apiVersion: aiscaler.aiscaler.io/v1
+kind: AIScaler
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-scaling-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: aiscaler-sample
+spec:
+  # TODO(user): Add fields here
+
+
+================================================================================
+FILE: config/samples/kustomization.yaml
+SIZE: 126.0 B
+LAST MODIFIED: 2026-03-16 18:26:54
+================================================================================
+
+## Append samples of your project ##
+resources:
+- aiscaler_v1_aiscaler.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples
+
+
+================================================================================
+FILE: go.mod
+SIZE: 4.6 KB
+LAST MODIFIED: 2026-03-18 12:47:10
+================================================================================
+
+module github.com/sanjbh/kube-scaling-agent
+
+go 1.25.0
+
+require (
+	github.com/onsi/ginkgo/v2 v2.27.2
+	github.com/onsi/gomega v1.38.2
+	github.com/sashabaranov/go-openai v1.41.2
+	k8s.io/api v0.35.2
+	k8s.io/apimachinery v0.35.2
+	k8s.io/client-go v0.35.2
+	sigs.k8s.io/controller-runtime v0.22.4
+)
+
+require (
+	cel.dev/expr v0.24.0 // indirect
+	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
+	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/blang/semver/v4 v4.0.0 // indirect
+	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
+	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
+	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
+	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-logr/zapr v1.3.0 // indirect
+	github.com/go-openapi/jsonpointer v0.21.0 // indirect
+	github.com/go-openapi/jsonreference v0.20.2 // indirect
+	github.com/go-openapi/swag v0.23.0 // indirect
+	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/google/btree v1.1.3 // indirect
+	github.com/google/cel-go v0.26.0 // indirect
+	github.com/google/gnostic-models v0.7.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/josharian/intern v1.0.0 // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/mailru/easyjson v0.7.7 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/prometheus/client_golang v1.22.0 // indirect
+	github.com/prometheus/client_model v0.6.1 // indirect
+	github.com/prometheus/common v0.62.0 // indirect
+	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/spf13/cobra v1.9.1 // indirect
+	github.com/spf13/pflag v1.0.9 // indirect
+	github.com/stoewer/go-strcase v1.3.0 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
+	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0 // indirect
+	go.opentelemetry.io/otel v1.35.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.34.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.34.0 // indirect
+	go.opentelemetry.io/otel/metric v1.35.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.34.0 // indirect
+	go.opentelemetry.io/otel/trace v1.35.0 // indirect
+	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.3 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
+	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/oauth2 v0.30.0 // indirect
+	golang.org/x/sync v0.18.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/term v0.37.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/time v0.9.0 // indirect
+	golang.org/x/tools v0.38.0 // indirect
+	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250303144028-a0af3efb3deb // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250303144028-a0af3efb3deb // indirect
+	google.golang.org/grpc v1.72.1 // indirect
+	google.golang.org/protobuf v1.36.8 // indirect
+	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
+	gopkg.in/inf.v0 v0.9.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/apiextensions-apiserver v0.34.1 // indirect
+	k8s.io/apiserver v0.34.1 // indirect
+	k8s.io/component-base v0.34.1 // indirect
+	k8s.io/klog/v2 v2.130.1 // indirect
+	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect
+	k8s.io/metrics v0.35.2 // indirect
+	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 // indirect
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
+	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
+	sigs.k8s.io/randfill v1.0.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
+	sigs.k8s.io/yaml v1.6.0 // indirect
+)
+
+
+================================================================================
+FILE: go.sum
+SIZE: 26.9 KB
+LAST MODIFIED: 2026-03-18 12:47:10
+================================================================================
+
+cel.dev/expr v0.24.0 h1:56OvJKSH3hDGL0ml5uSxZmz3/3Pq4tJ+fb1unVLAFcY=
+cel.dev/expr v0.24.0/go.mod h1:hLPLo1W4QUmuYdA72RBX06QTs6MXw941piREPl3Yfiw=
+github.com/antlr4-go/antlr/v4 v4.13.0 h1:lxCg3LAv+EUK6t1i0y1V6/SLeUi0eKEKdhQAlS8TVTI=
+github.com/antlr4-go/antlr/v4 v4.13.0/go.mod h1:pfChB/xh/Unjila75QW7+VU4TSnWnnk9UTnmpPaOR2g=
+github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
+github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
+github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
+github.com/blang/semver/v4 v4.0.0/go.mod h1:IbckMUScFkM3pff0VJDNKRiT6TG/YpiHIM2yvyW5YoQ=
+github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
+github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
+github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
+github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
+github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
+github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
+github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/emicklei/go-restful/v3 v3.12.2 h1:DhwDP0vY3k8ZzE0RunuJy8GhNpPL6zqLkDf9B/a0/xU=
+github.com/emicklei/go-restful/v3 v3.12.2/go.mod h1:6n3XBCmQQb25CM2LCACGz8ukIrRry+4bhvbpWn3mrbc=
+github.com/evanphx/json-patch v0.5.2 h1:xVCHIVMUu1wtM/VkR9jVZ45N3FhZfYMMYGorLCR8P3k=
+github.com/evanphx/json-patch v0.5.2/go.mod h1:ZWS5hhDbVDyob71nXKNL0+PWn6ToqBHMikGIFbs31qQ=
+github.com/evanphx/json-patch/v5 v5.9.11 h1:/8HVnzMq13/3x9TPvjG08wUGqBTmZBsCWzjTM0wiaDU=
+github.com/evanphx/json-patch/v5 v5.9.11/go.mod h1:3j+LviiESTElxA4p3EMKAB9HXj3/XEtnUf6OZxqIQTM=
+github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2Wg=
+github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
+github.com/fsnotify/fsnotify v1.9.0 h1:2Ml+OJNzbYCTzsxtv8vKSFD9PbJjmhYF14k/jKC7S9k=
+github.com/fsnotify/fsnotify v1.9.0/go.mod h1:8jBTzvmWwFyi3Pb8djgCCO5IBqzKJ/Jwo8TRcHyHii0=
+github.com/fxamacker/cbor/v2 v2.9.0 h1:NpKPmjDBgUfBms6tr6JZkTHtfFGcMKsw3eGcmD/sapM=
+github.com/fxamacker/cbor/v2 v2.9.0/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
+github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
+github.com/go-logr/logr v1.4.2 h1:6pFjapn8bFcIbiKo3XT4j/BhANplGihG6tvd+8rYgrY=
+github.com/go-logr/logr v1.4.2/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
+github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
+github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
+github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=
+github.com/go-logr/stdr v1.2.2/go.mod h1:mMo/vtBO5dYbehREoey6XUKy/eSumjCCveDpRre4VKE=
+github.com/go-logr/zapr v1.3.0 h1:XGdV8XW8zdwFiwOA2Dryh1gj2KRQyOOoNmBy4EplIcQ=
+github.com/go-logr/zapr v1.3.0/go.mod h1:YKepepNBd1u/oyhd/yQmtjVXmm9uML4IXUgMOwR8/Gg=
+github.com/go-openapi/jsonpointer v0.19.6/go.mod h1:osyAmYz/mB/C3I+WsTTSgw1ONzaLJoLCyoi6/zppojs=
+github.com/go-openapi/jsonpointer v0.21.0 h1:YgdVicSA9vH5RiHs9TZW5oyafXZFc6+2Vc1rr/O9oNQ=
+github.com/go-openapi/jsonpointer v0.21.0/go.mod h1:IUyH9l/+uyhIYQ/PXVA41Rexl+kOkAPDdXEYns6fzUY=
+github.com/go-openapi/jsonreference v0.20.2 h1:3sVjiK66+uXK/6oQ8xgcRKcFgQ5KXa2KvnJRumpMGbE=
+github.com/go-openapi/jsonreference v0.20.2/go.mod h1:Bl1zwGIM8/wsvqjsOQLJ/SH+En5Ap4rVB5KVcIDZG2k=
+github.com/go-openapi/swag v0.22.3/go.mod h1:UzaqsxGiab7freDnrUUra0MwWfN/q7tE4j+VcZ0yl14=
+github.com/go-openapi/swag v0.23.0 h1:vsEVJDUo2hPJ2tu0/Xc+4noaxyEffXNIs3cOULZ+GrE=
+github.com/go-openapi/swag v0.23.0/go.mod h1:esZ8ITTYEsH1V2trKHjAN8Ai7xHb8RV+YSZ577vPjgQ=
+github.com/go-task/slim-sprig/v3 v3.0.0 h1:sUs3vkvUymDpBKi3qH1YSqBQk9+9D/8M2mN1vB6EwHI=
+github.com/go-task/slim-sprig/v3 v3.0.0/go.mod h1:W848ghGpv3Qj3dhTPRyJypKRiqCdHZiAzKg9hl15HA8=
+github.com/gogo/protobuf v1.3.2 h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=
+github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
+github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=
+github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
+github.com/google/btree v1.1.3 h1:CVpQJjYgC4VbzxeGVHfvZrv1ctoYCAI8vbl07Fcxlyg=
+github.com/google/btree v1.1.3/go.mod h1:qOPhT0dTNdNzV6Z/lhRX0YXUafgPLFUh+gZMl761Gm4=
+github.com/google/cel-go v0.26.0 h1:DPGjXackMpJWH680oGY4lZhYjIameYmR+/6RBdDGmaI=
+github.com/google/cel-go v0.26.0/go.mod h1:A9O8OU9rdvrK5MQyrqfIxo1a0u4g3sF8KB6PUIaryMM=
+github.com/google/gnostic-models v0.7.0 h1:qwTtogB15McXDaNqTZdzPJRHvaVJlAl+HVQnLmJEJxo=
+github.com/google/gnostic-models v0.7.0/go.mod h1:whL5G0m6dmc5cPxKc5bdKdEN3UjI7OUGxBlw57miDrQ=
+github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
+github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
+github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
+github.com/google/gofuzz v1.2.0 h1:xRy4A+RhZaiKjJ1bPfwQ8sedCA+YS2YcCHW6ec7JMi0=
+github.com/google/gofuzz v1.2.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
+github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db h1:097atOisP2aRj7vFgYQBbFN4U4JNXUNYpxael3UzMyo=
+github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db/go.mod h1:vavhavw2zAxS5dIdcRluK6cSGGPlZynqzFM8NdvU144=
+github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 h1:BHT72Gu3keYf3ZEu2J0b1vyeLSOYI8bm5wbJM/8yDe8=
+github.com/google/pprof v0.0.0-20250403155104-27863c87afa6/go.mod h1:boTsfXsheKC2y+lKOCMpSfarhxDeIzfZG1jqGcPl3cA=
+github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
+github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 h1:5ZPtiqj0JL5oKWmcsq4VMaAW5ukBEgSGXEN89zeH1Jo=
+github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3/go.mod h1:ndYquD05frm2vACXE1nsccT4oJzjhw2arTS2cpUD1PI=
+github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
+github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
+github.com/josharian/intern v1.0.0 h1:vlS4z54oSdjm0bgjRigI+G1HpF+tI+9rE5LLzOg8HmY=
+github.com/josharian/intern v1.0.0/go.mod h1:5DoeVV0s6jJacbCEi61lwdGj/aVlrQvzHFFd8Hwg//Y=
+github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
+github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
+github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
+github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
+github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=
+github.com/klauspost/compress v1.18.0/go.mod h1:2Pp+KzxcywXVXMr50+X0Q/Lsb43OQHYWRCY2AiWywWQ=
+github.com/kr/pretty v0.2.1/go.mod h1:ipq/a2n7PKx3OHsz4KJII5eveXtPO4qwEXGdVfWzfnI=
+github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
+github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=
+github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
+github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
+github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
+github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=
+github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=
+github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
+github.com/mailru/easyjson v0.7.7 h1:UGYAvKxe3sBsEDzO8ZeWOSlIQfWFlxbzLZe7hwFURr0=
+github.com/mailru/easyjson v0.7.7/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
+github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
+github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd h1:TRLaZ9cD/w8PVh93nsPXa1VrQ6jlwL5oN8l14QlcNfg=
+github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
+github.com/modern-go/reflect2 v1.0.2/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
+github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee h1:W5t00kpgFdJifH4BDsTlE89Zl93FEloxaWZfGcifgq8=
+github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
+github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
+github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
+github.com/onsi/ginkgo/v2 v2.22.0 h1:Yed107/8DjTr0lKCNt7Dn8yQ6ybuDRQoMGrNFKzMfHg=
+github.com/onsi/ginkgo/v2 v2.22.0/go.mod h1:7Du3c42kxCUegi0IImZ1wUQzMBVecgIHjR1C+NkhLQo=
+github.com/onsi/ginkgo/v2 v2.27.2 h1:LzwLj0b89qtIy6SSASkzlNvX6WktqurSHwkk2ipF/Ns=
+github.com/onsi/ginkgo/v2 v2.27.2/go.mod h1:ArE1D/XhNXBXCBkKOLkbsb2c81dQHCRcF5zwn/ykDRo=
+github.com/onsi/gomega v1.36.1 h1:bJDPBO7ibjxcbHMgSCoo4Yj18UWbKDlLwX1x9sybDcw=
+github.com/onsi/gomega v1.36.1/go.mod h1:PvZbdDc8J6XJEpDK4HCuRBm8a6Fzp9/DmhC9C7yFlog=
+github.com/onsi/gomega v1.38.2 h1:eZCjf2xjZAqe+LeWvKb5weQ+NcPwX84kqJ0cZNxok2A=
+github.com/onsi/gomega v1.38.2/go.mod h1:W2MJcYxRGV63b418Ai34Ud0hEdTVXq9NW9+Sx6uXf3k=
+github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
+github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/prometheus/client_golang v1.22.0 h1:rb93p9lokFEsctTys46VnV1kLCDpVZ0a/Y92Vm0Zc6Q=
+github.com/prometheus/client_golang v1.22.0/go.mod h1:R7ljNsLXhuQXYZYtw6GAE9AZg8Y7vEW5scdCXrWRXC0=
+github.com/prometheus/client_model v0.6.1 h1:ZKSh/rekM+n3CeS952MLRAdFwIKqeY8b62p8ais2e9E=
+github.com/prometheus/client_model v0.6.1/go.mod h1:OrxVMOVHjw3lKMa8+x6HeMGkHMQyHDk9E3jmP2AmGiY=
+github.com/prometheus/common v0.62.0 h1:xasJaQlnWAeyHdUBeGjXmutelfJHWMRr+Fg4QszZ2Io=
+github.com/prometheus/common v0.62.0/go.mod h1:vyBcEuLSvWos9B1+CyL7JZ2up+uFzXhkqml0W5zIY1I=
+github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0learggepc=
+github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
+github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR38lUII=
+github.com/rogpeppe/go-internal v1.13.1/go.mod h1:uMEvuHeurkdAXX61udpOXGD/AzZDWNMNyH2VO9fmH0o=
+github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
+github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
+github.com/sashabaranov/go-openai v1.41.2 h1:vfPRBZNMpnqu8ELsclWcAvF19lDNgh1t6TVfFFOPiSM=
+github.com/sashabaranov/go-openai v1.41.2/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
+github.com/spf13/cobra v1.9.1 h1:CXSaggrXdbHK9CF+8ywj8Amf7PBRmPCOJugH954Nnlo=
+github.com/spf13/cobra v1.9.1/go.mod h1:nDyEzZ8ogv936Cinf6g1RU9MRY64Ir93oCnqb9wxYW0=
+github.com/spf13/pflag v1.0.6 h1:jFzHGLGAlb3ruxLB8MhbI6A8+AQX/2eW4qeyNZXNp2o=
+github.com/spf13/pflag v1.0.6/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
+github.com/spf13/pflag v1.0.9 h1:9exaQaMOCwffKiiiYk6/BndUBv+iRViNW+4lEMi0PvY=
+github.com/spf13/pflag v1.0.9/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
+github.com/stoewer/go-strcase v1.3.0 h1:g0eASXYtp+yvN9fK8sH94oCIk0fau9uV1/ZdJ0AVEzs=
+github.com/stoewer/go-strcase v1.3.0/go.mod h1:fAH5hQ5pehh+j3nZfvwdk2RgEgQjAoM8wodgtPmh1xo=
+github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
+github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=
+github.com/stretchr/objx v0.5.0/go.mod h1:Yh+to48EsGEfYuaHDzXPcE3xhTkx73EhmCGUpEOglKo=
+github.com/stretchr/objx v0.5.2 h1:xuMeJ0Sdp5ZMRXx/aWO6RZxdr3beISkG5/G/aIRr3pY=
+github.com/stretchr/objx v0.5.2/go.mod h1:FRsXN1f5AsAjCGJKqEizvkpNtU+EGNCLh3NxZ/8L+MA=
+github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
+github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
+github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
+github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
+github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
+github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
+github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
+github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
+github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
+github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
+github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
+go.opentelemetry.io/auto/sdk v1.1.0 h1:cH53jehLUN6UFLY71z+NDOiNJqDdPRaXzTel0sJySYA=
+go.opentelemetry.io/auto/sdk v1.1.0/go.mod h1:3wSPjt5PWp2RhlCcmmOial7AvC4DQqZb7a7wCow3W8A=
+go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0 h1:yd02MEjBdJkG3uabWP9apV+OuWRIXGDuJEUJbOHmCFU=
+go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0/go.mod h1:umTcuxiv1n/s/S6/c2AT/g2CQ7u5C59sHDNmfSwgz7Q=
+go.opentelemetry.io/otel v1.35.0 h1:xKWKPxrxB6OtMCbmMY021CqC45J+3Onta9MqjhnusiQ=
+go.opentelemetry.io/otel v1.35.0/go.mod h1:UEqy8Zp11hpkUrL73gSlELM0DupHoiq72dR+Zqel/+Y=
+go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.34.0 h1:OeNbIYk/2C15ckl7glBlOBp5+WlYsOElzTNmiPW/x60=
+go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.34.0/go.mod h1:7Bept48yIeqxP2OZ9/AqIpYS94h2or0aB4FypJTc8ZM=
+go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.34.0 h1:tgJ0uaNS4c98WRNUEx5U3aDlrDOI5Rs+1Vifcw4DJ8U=
+go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.34.0/go.mod h1:U7HYyW0zt/a9x5J1Kjs+r1f/d4ZHnYFclhYY2+YbeoE=
+go.opentelemetry.io/otel/metric v1.35.0 h1:0znxYu2SNyuMSQT4Y9WDWej0VpcsxkuklLa4/siN90M=
+go.opentelemetry.io/otel/metric v1.35.0/go.mod h1:nKVFgxBZ2fReX6IlyW28MgZojkoAkJGaE8CpgeAU3oE=
+go.opentelemetry.io/otel/sdk v1.34.0 h1:95zS4k/2GOy069d321O8jWgYsW3MzVV+KuSPKp7Wr1A=
+go.opentelemetry.io/otel/sdk v1.34.0/go.mod h1:0e/pNiaMAqaykJGKbi+tSjWfNNHMTxoC9qANsCzbyxU=
+go.opentelemetry.io/otel/sdk/metric v1.34.0 h1:5CeK9ujjbFVL5c1PhLuStg1wxA7vQv7ce1EK0Gyvahk=
+go.opentelemetry.io/otel/sdk/metric v1.34.0/go.mod h1:jQ/r8Ze28zRKoNRdkjCZxfs6YvBTG1+YIqyFVFYec5w=
+go.opentelemetry.io/otel/trace v1.35.0 h1:dPpEfJu1sDIqruz7BHFG3c7528f6ddfSWfFDVt/xgMs=
+go.opentelemetry.io/otel/trace v1.35.0/go.mod h1:WUk7DtFp1Aw2MkvqGdwiXYDZZNvA/1J8o6xRXLrIkyc=
+go.opentelemetry.io/proto/otlp v1.5.0 h1:xJvq7gMzB31/d406fB8U5CBdyQGw4P399D1aQWU/3i4=
+go.opentelemetry.io/proto/otlp v1.5.0/go.mod h1:keN8WnHxOy8PG0rQZjJJ5A2ebUoafqWp0eVQ4yIXvJ4=
+go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
+go.uber.org/goleak v1.3.0/go.mod h1:CoHD4mav9JJNrW/WLlf7HGZPjdw8EucARQHekz1X6bE=
+go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
+go.uber.org/multierr v1.11.0/go.mod h1:20+QtiLqy0Nd6FdQB9TLXag12DsQkrbs3htMFfDN80Y=
+go.uber.org/zap v1.27.0 h1:aJMhYGrd5QSmlpLMr2MftRKl7t8J8PTZPA732ud/XR8=
+go.uber.org/zap v1.27.0/go.mod h1:GB2qFLM7cTU87MWRP2mPIjqfIDnGu+VIO4V/SdhGo2E=
+go.yaml.in/yaml/v2 v2.4.2 h1:DzmwEr2rDGHl7lsFgAHxmNz/1NlQ7xLIrlN2h5d1eGI=
+go.yaml.in/yaml/v2 v2.4.2/go.mod h1:081UH+NErpNdqlCXm3TtEran0rJZGxAYx9hb/ELlsPU=
+go.yaml.in/yaml/v2 v2.4.3 h1:6gvOSjQoTB3vt1l+CU+tSyi/HOjfOjRLJ4YwYZGwRO0=
+go.yaml.in/yaml/v2 v2.4.3/go.mod h1:zSxWcmIDjOzPXpjlTTbAsKokqkDNAVtZO0WOMiT90s8=
+go.yaml.in/yaml/v3 v3.0.4 h1:tfq32ie2Jv2UxXFdLJdh3jXuOzWiL1fo0bu/FbuKpbc=
+go.yaml.in/yaml/v3 v3.0.4/go.mod h1:DhzuOOF2ATzADvBadXxruRBLzYTpT36CKvDb3+aBEFg=
+golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
+golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
+golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
+golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 h1:2dVuKD2vS7b0QIHQbpyTISPd0LeHDbnYEryqj5Q1ug8=
+golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56/go.mod h1:M4RDyNAINzryxdtnbRXRL/OHtkFuWGRjvuhBJpk2IlY=
+golang.org/x/mod v0.2.0/go.mod h1:s0Qsj1ACt9ePp/hMypM3fl4fZqREWJwdYDEqhRiZZUA=
+golang.org/x/mod v0.3.0/go.mod h1:s0Qsj1ACt9ePp/hMypM3fl4fZqREWJwdYDEqhRiZZUA=
+golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
+golang.org/x/net v0.0.0-20190620200207-3b0461eec859/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
+golang.org/x/net v0.0.0-20200226121028-0de0cce0169b/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
+golang.org/x/net v0.0.0-20201021035429-f5854403a974/go.mod h1:sp8m0HH+o8qH0wwXwYZr8TS3Oi6o0r6Gce1SSxlDquU=
+golang.org/x/net v0.38.0 h1:vRMAPTMaeGqVhG5QyLJHqNDwecKTomGeqbnfZyKlBI8=
+golang.org/x/net v0.38.0/go.mod h1:ivrbrMbzFq5J41QOQh0siUuly180yBYtLp+CKbEaFx8=
+golang.org/x/net v0.47.0 h1:Mx+4dIFzqraBXUugkia1OOvlD6LemFo1ALMHjrXDOhY=
+golang.org/x/net v0.47.0/go.mod h1:/jNxtkgq5yWUGYkaZGqo27cfGZ1c5Nen03aYrrKpVRU=
+golang.org/x/oauth2 v0.27.0 h1:da9Vo7/tDv5RH/7nZDz1eMGS/q1Vv1N/7FCrBhI9I3M=
+golang.org/x/oauth2 v0.27.0/go.mod h1:onh5ek6nERTohokkhCD/y2cV4Do3fxFHFuAejCkRWT8=
+golang.org/x/oauth2 v0.30.0 h1:dnDm7JmhM45NNpd8FDDeLhK6FwqbOf4MLCM9zb1BOHI=
+golang.org/x/oauth2 v0.30.0/go.mod h1:B++QgG3ZKulg6sRPGD/mqlHQs5rB3Ml9erfeDY7xKlU=
+golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+golang.org/x/sync v0.12.0 h1:MHc5BpPuC30uJk597Ri8TV3CNZcTLu6B6z4lJy+g6Jw=
+golang.org/x/sync v0.12.0/go.mod h1:1dzgHSNfp02xaA81J2MS99Qcpr2w7fw1gpm99rleRqA=
+golang.org/x/sync v0.18.0 h1:kr88TuHDroi+UVf+0hZnirlk8o8T+4MrK6mr60WkH/I=
+golang.org/x/sync v0.18.0/go.mod h1:9KTHXmSnoGruLpwFjVSX0lNNA75CykiMECbovNTZqGI=
+golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.31.0 h1:ioabZlmFYtWhL+TRYpcnNlLwhyxaM9kWTDEmfnprqik=
+golang.org/x/sys v0.31.0/go.mod h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k=
+golang.org/x/sys v0.38.0 h1:3yZWxaJjBmCWXqhN1qh02AkOnCQ1poK6oF+a7xWL6Gc=
+golang.org/x/sys v0.38.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
+golang.org/x/term v0.30.0 h1:PQ39fJZ+mfadBm0y5WlL4vlM7Sx1Hgf13sMIY2+QS9Y=
+golang.org/x/term v0.30.0/go.mod h1:NYYFdzHoI5wRh/h5tDMdMqCqPJZEuNqVR5xJLd/n67g=
+golang.org/x/term v0.37.0 h1:8EGAD0qCmHYZg6J17DvsMy9/wJ7/D/4pV/wfnld5lTU=
+golang.org/x/term v0.37.0/go.mod h1:5pB4lxRNYYVZuTLmy8oR2BH8dflOR+IbTYFD8fi3254=
+golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+golang.org/x/text v0.3.3/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
+golang.org/x/text v0.23.0 h1:D71I7dUrlY+VX0gQShAThNGHFxZ13dGLBHQLVl1mJlY=
+golang.org/x/text v0.23.0/go.mod h1:/BLNzu4aZCJ1+kcD0DNRotWKage4q2rGVAg4o22unh4=
+golang.org/x/text v0.31.0 h1:aC8ghyu4JhP8VojJ2lEHBnochRno1sgL6nEi9WGFGMM=
+golang.org/x/text v0.31.0/go.mod h1:tKRAlv61yKIjGGHX/4tP1LTbc13YSec1pxVEWXzfoeM=
+golang.org/x/time v0.9.0 h1:EsRrnYcQiGH+5FfbgvV4AP7qEZstoyrHB0DzarOQ4ZY=
+golang.org/x/time v0.9.0/go.mod h1:3BpzKBy/shNhVucY/MWOyx10tF3SFh9QdLuxbVysPQM=
+golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
+golang.org/x/tools v0.0.0-20191119224855-298f0cb1881e/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
+golang.org/x/tools v0.0.0-20200619180055-7c47624df98f/go.mod h1:EkVYQZoAsY45+roYkvgYkIh4xh/qjgUK9TdY2XT94GE=
+golang.org/x/tools v0.0.0-20210106214847-113979e3529a/go.mod h1:emZCQorbCU4vsT4fOWvOPXz4eW1wZW4PmDk9uLelYpA=
+golang.org/x/tools v0.26.0 h1:v/60pFQmzmT9ExmjDv2gGIfi3OqfKoEP6I5+umXlbnQ=
+golang.org/x/tools v0.26.0/go.mod h1:TPVVj70c7JJ3WCazhD8OdXcZg/og+b9+tH/KxylGwH0=
+golang.org/x/tools v0.38.0 h1:Hx2Xv8hISq8Lm16jvBZ2VQf+RLmbd7wVUsALibYI/IQ=
+golang.org/x/tools v0.38.0/go.mod h1:yEsQ/d/YK8cjh0L6rZlY8tgtlKiBNTL14pGDJPJpYQs=
+golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+gomodules.xyz/jsonpatch/v2 v2.4.0 h1:Ci3iUJyx9UeRx7CeFN8ARgGbkESwJK+KB9lLcWxY/Zw=
+gomodules.xyz/jsonpatch/v2 v2.4.0/go.mod h1:AH3dM2RI6uoBZxn3LVrfvJ3E0/9dG4cSrbuBJT4moAY=
+google.golang.org/genproto/googleapis/api v0.0.0-20250303144028-a0af3efb3deb h1:p31xT4yrYrSM/G4Sn2+TNUkVhFCbG9y8itM2S6Th950=
+google.golang.org/genproto/googleapis/api v0.0.0-20250303144028-a0af3efb3deb/go.mod h1:jbe3Bkdp+Dh2IrslsFCklNhweNTBgSYanP1UXhJDhKg=
+google.golang.org/genproto/googleapis/rpc v0.0.0-20250303144028-a0af3efb3deb h1:TLPQVbx1GJ8VKZxz52VAxl1EBgKXXbTiU9Fc5fZeLn4=
+google.golang.org/genproto/googleapis/rpc v0.0.0-20250303144028-a0af3efb3deb/go.mod h1:LuRYeWDFV6WOn90g357N17oMCaxpgCnbi/44qJvDn2I=
+google.golang.org/grpc v1.72.1 h1:HR03wO6eyZ7lknl75XlxABNVLLFc2PAb6mHlYh756mA=
+google.golang.org/grpc v1.72.1/go.mod h1:wH5Aktxcg25y1I3w7H69nHfXdOG3UiadoBtjh3izSDM=
+google.golang.org/protobuf v1.36.5 h1:tPhr+woSbjfYvY6/GPufUoYizxw1cF/yFoxJ2fmpwlM=
+google.golang.org/protobuf v1.36.5/go.mod h1:9fA7Ob0pmnwhb644+1+CVWFRbNajQ6iRojtC/QF5bRE=
+google.golang.org/protobuf v1.36.8 h1:xHScyCOEuuwZEc6UtSOvPbAT4zRh0xcNRYekJwfqyMc=
+google.golang.org/protobuf v1.36.8/go.mod h1:fuxRtAxBytpl4zzqUh6/eyUujkJdNiuEkXntxiD/uRU=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntNwaWcugrBjAiHlqqRiVk=
+gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EVd6muEfDQjcINNoR0C8j2r3qZ4Q=
+gopkg.in/evanphx/json-patch.v4 v4.12.0 h1:n6jtcsulIzXPJaxegRbvFNNrZDjbij7ny3gmSPG+6V4=
+gopkg.in/evanphx/json-patch.v4 v4.12.0/go.mod h1:p8EYWUEYMpynmqDbY58zCKCFZw8pRWMG4EsWvDvM72M=
+gopkg.in/evanphx/json-patch.v4 v4.13.0 h1:czT3CmqEaQ1aanPc5SdlgQrrEIb8w/wwCvWWnfEbYzo=
+gopkg.in/evanphx/json-patch.v4 v4.13.0/go.mod h1:p8EYWUEYMpynmqDbY58zCKCFZw8pRWMG4EsWvDvM72M=
+gopkg.in/inf.v0 v0.9.1 h1:73M5CoZyi3ZLMOyDlQh031Cx6N9NDJ2Vvfl76EDAgDc=
+gopkg.in/inf.v0 v0.9.1/go.mod h1:cWUDdTG/fYaXco+Dcufb5Vnc6Gp2YChqWtbxRZE0mXw=
+gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+k8s.io/api v0.34.1 h1:jC+153630BMdlFukegoEL8E/yT7aLyQkIVuwhmwDgJM=
+k8s.io/api v0.34.1/go.mod h1:SB80FxFtXn5/gwzCoN6QCtPD7Vbu5w2n1S0J5gFfTYk=
+k8s.io/api v0.35.2 h1:tW7mWc2RpxW7HS4CoRXhtYHSzme1PN1UjGHJ1bdrtdw=
+k8s.io/api v0.35.2/go.mod h1:7AJfqGoAZcwSFhOjcGM7WV05QxMMgUaChNfLTXDRE60=
+k8s.io/apiextensions-apiserver v0.34.1 h1:NNPBva8FNAPt1iSVwIE0FsdrVriRXMsaWFMqJbII2CI=
+k8s.io/apiextensions-apiserver v0.34.1/go.mod h1:hP9Rld3zF5Ay2Of3BeEpLAToP+l4s5UlxiHfqRaRcMc=
+k8s.io/apimachinery v0.34.1 h1:dTlxFls/eikpJxmAC7MVE8oOeP1zryV7iRyIjB0gky4=
+k8s.io/apimachinery v0.34.1/go.mod h1:/GwIlEcWuTX9zKIg2mbw0LRFIsXwrfoVxn+ef0X13lw=
+k8s.io/apimachinery v0.35.2 h1:NqsM/mmZA7sHW02JZ9RTtk3wInRgbVxL8MPfzSANAK8=
+k8s.io/apimachinery v0.35.2/go.mod h1:jQCgFZFR1F4Ik7hvr2g84RTJSZegBc8yHgFWKn//hns=
+k8s.io/apiserver v0.34.1 h1:U3JBGdgANK3dfFcyknWde1G6X1F4bg7PXuvlqt8lITA=
+k8s.io/apiserver v0.34.1/go.mod h1:eOOc9nrVqlBI1AFCvVzsob0OxtPZUCPiUJL45JOTBG0=
+k8s.io/client-go v0.34.1 h1:ZUPJKgXsnKwVwmKKdPfw4tB58+7/Ik3CrjOEhsiZ7mY=
+k8s.io/client-go v0.34.1/go.mod h1:kA8v0FP+tk6sZA0yKLRG67LWjqufAoSHA2xVGKw9Of8=
+k8s.io/client-go v0.35.2 h1:YUfPefdGJA4aljDdayAXkc98DnPkIetMl4PrKX97W9o=
+k8s.io/client-go v0.35.2/go.mod h1:4QqEwh4oQpeK8AaefZ0jwTFJw/9kIjdQi0jpKeYvz7g=
+k8s.io/component-base v0.34.1 h1:v7xFgG+ONhytZNFpIz5/kecwD+sUhVE6HU7qQUiRM4A=
+k8s.io/component-base v0.34.1/go.mod h1:mknCpLlTSKHzAQJJnnHVKqjxR7gBeHRv0rPXA7gdtQ0=
+k8s.io/klog/v2 v2.130.1 h1:n9Xl7H1Xvksem4KFG4PYbdQCQxqc/tTUyrgXaOhHSzk=
+k8s.io/klog/v2 v2.130.1/go.mod h1:3Jpz1GvMt720eyJH1ckRHK1EDfpxISzJ7I9OYgaDtPE=
+k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b h1:MloQ9/bdJyIu9lb1PzujOPolHyvO06MXG5TUIj2mNAA=
+k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b/go.mod h1:UZ2yyWbFTpuhSbFhv24aGNOdoRdJZgsIObGBUaYVsts=
+k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 h1:Y3gxNAuB0OBLImH611+UDZcmKS3g6CthxToOb37KgwE=
+k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912/go.mod h1:kdmbQkyfwUagLfXIad1y2TdrjPFWp2Q89B3qkRwf/pQ=
+k8s.io/metrics v0.35.2 h1:PJRP88qeadR5evg4ZKJAh3NR3ICchwM51/Aidd0LHjc=
+k8s.io/metrics v0.35.2/go.mod h1:w1pJmSu2j8ftVI26MGcJtMnpmZ06oKwb4Enm+xVl06Q=
+k8s.io/utils v0.0.0-20250604170112-4c0f3b243397 h1:hwvWFiBzdWw1FhfY1FooPn3kzWuJ8tmbZBHi4zVsl1Y=
+k8s.io/utils v0.0.0-20250604170112-4c0f3b243397/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
+k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 h1:SjGebBtkBqHFOli+05xYbK8YF1Dzkbzn+gDM4X9T4Ck=
+k8s.io/utils v0.0.0-20251002143259-bc988d571ff4/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
+sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 h1:jpcvIRr3GLoUoEKRkHKSmGjxb6lWwrBlJsXc+eUYQHM=
+sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2/go.mod h1:Ve9uj1L+deCXFrPOk1LpFXqTg7LCFzFso6PA48q/XZw=
+sigs.k8s.io/controller-runtime v0.22.4 h1:GEjV7KV3TY8e+tJ2LCTxUTanW4z/FmNB7l327UfMq9A=
+sigs.k8s.io/controller-runtime v0.22.4/go.mod h1:+QX1XUpTXN4mLoblf4tqr5CQcyHPAki2HLXqQMY6vh8=
+sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 h1:gBQPwqORJ8d8/YNZWEjoZs7npUVDpVXUUOFfW6CgAqE=
+sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8/go.mod h1:mdzfpAEoE6DHQEN0uh9ZbOCuHbLK5wOm7dK4ctXE9Tg=
+sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 h1:IpInykpT6ceI+QxKBbEflcR5EXP7sU1kvOlxwZh5txg=
+sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730/go.mod h1:mdzfpAEoE6DHQEN0uh9ZbOCuHbLK5wOm7dK4ctXE9Tg=
+sigs.k8s.io/randfill v1.0.0 h1:JfjMILfT8A6RbawdsK2JXGBR5AQVfd+9TbzrlneTyrU=
+sigs.k8s.io/randfill v1.0.0/go.mod h1:XeLlZ/jmk4i1HRopwe7/aU3H5n1zNUcX6TM94b3QxOY=
+sigs.k8s.io/structured-merge-diff/v6 v6.3.0 h1:jTijUJbW353oVOd9oTlifJqOGEkUw2jB/fXCbTiQEco=
+sigs.k8s.io/structured-merge-diff/v6 v6.3.0/go.mod h1:M3W8sfWvn2HhQDIbGWj3S099YozAsymCo/wrT5ohRUE=
+sigs.k8s.io/yaml v1.6.0 h1:G8fkbMSAFqgEFgh4b1wmtzDnioxFCUgTZhlbj5P9QYs=
+sigs.k8s.io/yaml v1.6.0/go.mod h1:796bPqUfzR/0jLAl6XjHl3Ck7MiyVv8dbTdyT3/pMf4=
+
+
+================================================================================
+FILE: hack/boilerplate.go.txt
+SIZE: 546.0 B
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+/*
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+================================================================================
+FILE: internal/actuator/actuator.go
+SIZE: 3.5 KB
+LAST MODIFIED: 2026-03-17 17:46:07
+================================================================================
+
+package actuator
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	aiscalerv1 "github.com/sanjbh/kube-scaling-agent/api/v1"
+	"github.com/sanjbh/kube-scaling-agent/internal/decision"
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+// Actuator applies scaling decisions to the target Deployment.
+// It uses Server-Side Apply so it only owns the replicas field —
+// other controllers can manage the rest of the Deployment freely.
+type Actuator struct {
+	client client.Client
+}
+
+// NewActuator creates a new Actuator.
+func NewActuator(client client.Client) *Actuator {
+	return &Actuator{
+		client: client,
+	}
+}
+
+// ApplyResult holds the outcome of an apply operation.
+type ApplyResult struct {
+	// PreviousReplicas is the replica count before this apply.
+	PreviousReplicas int32
+
+	// AppliedReplicas is the replica count after this apply.
+	AppliedReplicas int32
+
+	// AppliedAt is when the scale event was applied.
+	AppliedAt time.Time
+
+	// DryRun indicates the decision was computed but not applied.
+	DryRun bool
+}
+
+// Apply patches the target Deployment's replica count using SSA.
+// If policy.Spec.DryRun is true, it validates the patch without applying it.
+func (a *Actuator) Apply(
+	ctx context.Context,
+	policy *aiscalerv1.AIScaler,
+	result *decision.ValidationResult,
+) (*ApplyResult, error) {
+	// Fetch current replica count for the result record
+	currentReplicas, err := a.currentReplicas(ctx, policy)
+	if err != nil {
+		return nil, err
+	}
+
+	// No-op if replica count is already correct
+	if currentReplicas == result.ValidatedReplicas {
+		return &ApplyResult{
+			PreviousReplicas: currentReplicas,
+			AppliedReplicas:  currentReplicas,
+			AppliedAt:        time.Now(),
+			DryRun:           policy.Spec.DryRun,
+		}, nil
+	}
+
+	// Build a minimal Deployment with only the replicas field set.
+	// SSA means we only declare what we own — everything else is
+	// left untouched by other controllers.
+	deployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "apps/v1",
+			Kind:       "Deployment",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: policy.Spec.TargetRef.Namespace,
+			Name:      policy.Spec.TargetRef.Name,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &result.ValidatedReplicas,
+		},
+	}
+
+	// Build patch options
+	opts := []client.PatchOption{
+		client.FieldOwner("aiscaler"),
+		client.ForceOwnership,
+	}
+	if policy.Spec.DryRun {
+		opts = append(opts, client.DryRunAll)
+	}
+
+	// Apply patch
+	if err := a.client.Patch(ctx, deployment, client.Apply, opts...); err != nil {
+		return nil, fmt.Errorf("SSA patch failed for %s/%s: %w",
+			policy.Spec.TargetRef.Namespace,
+			policy.Spec.TargetRef.Name,
+			err,
+		)
+	}
+
+	return &ApplyResult{
+		PreviousReplicas: currentReplicas,
+		AppliedReplicas:  result.ValidatedReplicas,
+		AppliedAt:        time.Now(),
+		DryRun:           policy.Spec.DryRun,
+	}, nil
+}
+
+// currentReplicas fetches the current replica count of the target Deployment.
+func (a *Actuator) currentReplicas(
+	ctx context.Context,
+	policy *aiscalerv1.AIScaler,
+) (int32, error) {
+	deployment := &appsv1.Deployment{}
+	key := types.NamespacedName{
+		Namespace: policy.Spec.TargetRef.Namespace,
+		Name:      policy.Spec.TargetRef.Name,
+	}
+
+	if err := a.client.Get(ctx, key, deployment); err != nil {
+		return 0, fmt.Errorf("failed to get deployment %s/%s: %w",
+			policy.Spec.TargetRef.Namespace,
+			policy.Spec.TargetRef.Name,
+			err,
+		)
+	}
+
+	if deployment.Spec.Replicas == nil {
+		return 1, nil
+	}
+
+	return *deployment.Spec.Replicas, nil
+}
+
+
+================================================================================
+FILE: internal/config/config.go
+SIZE: 2.3 KB
+LAST MODIFIED: 2026-03-17 12:21:53
+================================================================================
+
+package config
+
+import (
+	"fmt"
+	"os"
+
+	"go.yaml.in/yaml/v2"
+)
+
+// Config is the central configuration for the entire operator.
+type Config struct {
+	LLM        LLMConfig        `yaml:"llm"`
+	Prometheus PrometheusConfig `yaml:"prometheus"`
+	Operator   OperatorConfig   `yaml:"operator"`
+}
+
+// LLMConfig holds configuration for all LLM providers as a list.
+type LLMConfig struct {
+	Providers []ProviderConfig `yaml:"providers"`
+}
+
+// ProviderConfig holds settings for a single LLM provider entry.
+type ProviderConfig struct {
+	Name    string `yaml:"name"`
+	BaseURL string `yaml:"base_url"`
+	APIKey  string `yaml:"api_key"`
+	Model   string `yaml:"model"`
+}
+
+// PrometheusConfig holds the default Prometheus endpoint.
+// Can be overridden per AIScaler in the CRD spec.
+type PrometheusConfig struct {
+	BaseURL string `yaml:"baseURL"`
+}
+
+// OperatorConfig holds general operator settings.
+type OperatorConfig struct {
+	LeaderElection         bool   `yaml:"leaderElection"`
+	MetricsBindAddress     string `yaml:"metricsBindAddress"`
+	HealthProbeBindAddress string `yaml:"healthProbeBindAddress"`
+}
+
+// Load reads the operator config from the given file path.
+func Load(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
+	}
+
+	if err := cfg.validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
+	return &cfg, nil
+
+}
+
+// validate checks that all required fields are present.
+func (c *Config) validate() error {
+	if len(c.LLM.Providers) == 0 {
+		return fmt.Errorf("at least one LLM provider must be configured")
+	}
+	for _, p := range c.LLM.Providers {
+		if p.Name == "" {
+			return fmt.Errorf("a provider entry is missing name")
+		}
+		if p.BaseURL == "" {
+			return fmt.Errorf("provider %q is missing baseURL", p.Name)
+		}
+		if p.Model == "" {
+			return fmt.Errorf("provider %q is missing model", p.Name)
+		}
+	}
+	return nil
+}
+
+// LLMProvider searches the provider list by name and returns its config.
+func (c *Config) LLMProvider(name string) (ProviderConfig, error) {
+	for _, p := range c.LLM.Providers {
+		if p.Name == name {
+			return p, nil
+		}
+	}
+	return ProviderConfig{}, fmt.Errorf("provider %q not found", name)
+}
+
+
+================================================================================
+FILE: internal/controller/aiscaler_controller.go
+SIZE: 10.0 KB
+LAST MODIFIED: 2026-03-18 11:35:55
+================================================================================
+
+/*
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package controller
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	aiscalerv1 "github.com/sanjbh/kube-scaling-agent/api/v1"
+	"github.com/sanjbh/kube-scaling-agent/internal/actuator"
+	"github.com/sanjbh/kube-scaling-agent/internal/decision"
+	"github.com/sanjbh/kube-scaling-agent/internal/llm"
+	"github.com/sanjbh/kube-scaling-agent/internal/signals"
+	appsv1 "k8s.io/api/apps/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const finalizerName = "aiscaler.io/finalizer"
+
+// AIScalerReconciler reconciles a AIScaler object
+type AIScalerReconciler struct {
+	client.Client
+	Scheme    *runtime.Scheme
+	Collector *signals.Collector
+	Router    *llm.Router
+	Validator *decision.Validator
+	Actuator  *actuator.Actuator
+}
+
+// reconcileState carries data between steps within a single reconcile cycle.
+type reconcileState struct {
+	obj        *aiscalerv1.AIScaler
+	bundle     *signals.Bundle
+	decision   *llm.ScalingDecision
+	provider   aiscalerv1.LLMProvider
+	validation *decision.ValidationResult
+}
+
+// StepFunc is a single reconciliation step.
+// A non-nil Result or error short-circuits the chain.
+type StepFunc func(ctx context.Context, state *reconcileState) (*ctrl.Result, error)
+
+// +kubebuilder:rbac:groups=aiscaler.io,resources=aiscalers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=aiscaler.io,resources=aiscalers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=aiscaler.io,resources=aiscalers/finalizers,verbs=update
+
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
+// TODO(user): Modify the Reconcile function to compare the state specified by
+// the AIScaler object against the actual cluster state, and then
+// perform operations to make the cluster state reflect the state specified by
+// the user.
+//
+// For more details, check Reconcile and its Result here:
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.4/pkg/reconcile
+func (r *AIScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := logf.FromContext(ctx)
+
+	obj := &aiscalerv1.AIScaler{}
+	if err := r.Get(ctx, req.NamespacedName, obj); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	log.Info("Reconciling", "name", obj.Name, "phase", obj.Status.Phase)
+
+	state := &reconcileState{
+		obj: obj,
+	}
+
+	steps := []StepFunc{
+		r.ensureFinalizer,
+		r.checkCooldown,
+		r.collectSignals,
+		r.fetchDecision,
+		r.validateDecision,
+		r.actuate,
+		r.updateStatus,
+	}
+
+	for _, step := range steps {
+		result, err := step(ctx, state)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if result != nil {
+			return *result, nil
+		}
+	}
+
+	return ctrl.Result{
+		RequeueAfter: obj.Spec.EvaluationInterval.Duration,
+	}, nil
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *AIScalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&aiscalerv1.AIScaler{}).
+		Owns(&appsv1.Deployment{}).
+		Named("aiscaler").
+		Complete(r)
+}
+
+func (r *AIScalerReconciler) ensureFinalizer(ctx context.Context, state *reconcileState) (*ctrl.Result, error) {
+	obj := state.obj
+	// handle deletion
+	if !obj.DeletionTimestamp.IsZero() {
+		if controllerutil.ContainsFinalizer(obj, finalizerName) {
+			controllerutil.RemoveFinalizer(obj, finalizerName)
+			if err := r.Update(ctx, obj); err != nil {
+				return nil, err
+			}
+		}
+
+		result := &ctrl.Result{}
+		return result, nil
+	}
+
+	// Add finalizer if missing
+	if !controllerutil.ContainsFinalizer(obj, finalizerName) {
+		controllerutil.AddFinalizer(obj, finalizerName)
+		if err := r.Update(ctx, obj); err != nil {
+			return nil, err
+		}
+	}
+	return nil, nil
+}
+
+func (r *AIScalerReconciler) checkCooldown(ctx context.Context, state *reconcileState) (*ctrl.Result, error) {
+	obj := state.obj
+
+	if obj.Status.LastScaleTime == nil {
+		return nil, nil
+	}
+
+	elapsed := time.Since(obj.Status.LastScaleTime.Time)
+	if elapsed < obj.Spec.CooldownPeriod.Duration {
+		remaining := obj.Spec.CooldownPeriod.Duration - elapsed
+		logf.FromContext(ctx).Info("in cooldown", "remaining", remaining)
+		result := &ctrl.Result{
+			RequeueAfter: remaining,
+		}
+		return result, nil
+	}
+	return nil, nil
+}
+
+func (r *AIScalerReconciler) collectSignals(
+	ctx context.Context,
+	state *reconcileState,
+) (*ctrl.Result, error) {
+
+	// obj := state.obj
+
+	log := logf.FromContext(ctx)
+
+	bundle, err := r.Collector.Collect(ctx, state.obj)
+	if err != nil {
+		log.Error(err, "failed to collect signals")
+		r.setCondition(
+			ctx,
+			state.obj,
+			aiscalerv1.ConditionSignalsReady,
+			metav1.ConditionFalse,
+			"CollectionFailed",
+			err.Error(),
+		)
+		return nil, err
+	}
+
+	// Check freeze annotation — if active, skip scaling entirely
+	if bundle.Annotations.FreezeUntil != nil && time.Now().Before(*bundle.Annotations.FreezeUntil) {
+		log.Info("scaling frozen", "until", *bundle.Annotations.FreezeUntil)
+		remaining := time.Until(*bundle.Annotations.FreezeUntil)
+		result := &ctrl.Result{
+			RequeueAfter: remaining,
+		}
+		return result, nil
+	}
+
+	r.setCondition(
+		ctx,
+		state.obj,
+		aiscalerv1.ConditionSignalsReady,
+		metav1.ConditionTrue,
+		"Collected",
+		"all signals collected successfully",
+	)
+
+	state.bundle = bundle
+
+	return nil, nil
+}
+
+func (r *AIScalerReconciler) fetchDecision(
+	ctx context.Context,
+	state *reconcileState,
+) (*ctrl.Result, error) {
+
+	log := logf.FromContext(ctx)
+	obj := state.obj
+	b := state.bundle
+
+	scalingRequest := llm.ScalingRequest{
+		PolicyName:          obj.Name,
+		CurrentReplicas:     obj.Status.CurrentReplicas,
+		Namespace:           obj.Namespace,
+		MinReplicas:         obj.Spec.Constraints.MinReplicas,
+		MaxReplicas:         obj.Spec.Constraints.MaxReplicas,
+		MaxScaleStep:        obj.Spec.Constraints.MaxScaleStep,
+		CPUUtilization:      b.CPUUtilization,
+		MemoryUtilization:   b.MemoryUtilization,
+		P95LatencyMs:        b.P95LatencyMs,
+		ErrorRate:           b.ErrorRate,
+		DeploymentReady:     b.DeploymentReady,
+		ExpectedTraffic:     b.Annotations.ExpectedTraffic,
+		ScaleConservatively: b.Annotations.ScaleConservatively,
+		Note:                b.Annotations.Note,
+		PeakHours:           b.Annotations.PeakHours,
+	}
+
+	scalingDecision, provider, err := r.Router.Decide(ctx, state.obj, scalingRequest)
+
+	if err != nil {
+		log.Error(err, "failed to decide")
+		r.setCondition(
+			ctx,
+			state.obj,
+			aiscalerv1.ConditionLLMReady,
+			metav1.ConditionFalse,
+			"DecisionFailed",
+			err.Error(),
+		)
+		return nil, err
+	}
+
+	log.Info(
+		"LLM decision",
+		"provider", provider,
+		"target", scalingDecision.TargetReplicas,
+		"confidence", scalingDecision.Confidence,
+	)
+
+	state.decision = scalingDecision
+	state.provider = provider
+
+	r.setCondition(
+		ctx,
+		state.obj,
+		aiscalerv1.ConditionLLMReady,
+		metav1.ConditionTrue,
+		"DecisionMade",
+		scalingDecision.Reasoning,
+	)
+	return nil, nil
+}
+
+// validateDecision never short-circuits the chain — it always passes through.
+// Validation is pure arithmetic so it cannot fail.
+func (r *AIScalerReconciler) validateDecision(ctx context.Context, state *reconcileState) (*ctrl.Result, error) {
+	validationResult := r.Validator.Validate(state.decision, state.bundle.CurrentReplicas, state.obj)
+	if validationResult.Clamped {
+		logf.FromContext(ctx).Info(
+			"decision clamped by validator",
+			"original", validationResult.OriginalReplicas,
+			"validated", validationResult.ValidatedReplicas,
+			"reason", validationResult.Reason,
+		)
+	}
+	state.validation = validationResult
+	return nil, nil
+}
+
+func (r *AIScalerReconciler) actuate(
+	ctx context.Context,
+	state *reconcileState,
+) (*ctrl.Result, error) {
+	log := logf.FromContext(ctx)
+
+	applyResult, err := r.Actuator.Apply(ctx, state.obj, state.validation)
+	if err != nil {
+		log.Error(err, "failed to apply scaling decision")
+		return nil, err
+	}
+
+	if applyResult.DryRun {
+		log.Info("dry run — decision computed but not applied",
+			"replicas", applyResult.AppliedReplicas)
+		return nil, nil
+	}
+
+	log.Info(
+		"scaling applied",
+		"previous", applyResult.PreviousReplicas,
+		"applied", applyResult.AppliedReplicas,
+	)
+	return nil, nil
+}
+
+func (r *AIScalerReconciler) updateStatus(
+	ctx context.Context,
+	state *reconcileState,
+) (*ctrl.Result, error) {
+
+	obj := state.obj
+	now := metav1.Now()
+
+	obj.Status.Phase = aiscalerv1.PhaseObserving
+	obj.Status.CurrentReplicas = state.bundle.CurrentReplicas
+	obj.Status.DesiredReplicas = state.validation.ValidatedReplicas
+	obj.Status.LastProvider = state.provider
+	obj.Status.LastDecisionReason = state.decision.Reasoning
+
+	// Only update LastScaleTime if replicas actually changed
+	if state.validation.ValidatedReplicas != state.bundle.CurrentReplicas {
+		obj.Status.LastScaleTime = &now
+		obj.Status.Phase = aiscalerv1.PhaseScaling
+	}
+
+	r.setCondition(
+		ctx,
+		obj,
+		aiscalerv1.ConditionReady,
+		metav1.ConditionTrue,
+		"Reconciled",
+		"reconcile cycle completed successfully",
+	)
+
+	if err := r.Status().Update(ctx, obj); err != nil {
+		return nil, fmt.Errorf("failed to update status: %w", err)
+	}
+	return nil, nil
+}
+
+func (r *AIScalerReconciler) setCondition(
+	ctx context.Context,
+	obj *aiscalerv1.AIScaler,
+	condType string,
+	status metav1.ConditionStatus,
+	reason, message string,
+) {
+	apimeta.SetStatusCondition(&obj.Status.Conditions, metav1.Condition{
+		Type:               condType,
+		Status:             status,
+		Reason:             reason,
+		Message:            message,
+		ObservedGeneration: obj.Generation,
+	})
+}
+
+
+================================================================================
+FILE: internal/controller/aiscaler_controller_test.go
+SIZE: 2.5 KB
+LAST MODIFIED: 2026-03-16 18:26:54
+================================================================================
+
+/*
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package controller
+
+import (
+	"context"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	aiscalerv1 "github.com/sanjbh/kube-scaling-agent/api/v1"
+)
+
+var _ = Describe("AIScaler Controller", func() {
+	Context("When reconciling a resource", func() {
+		const resourceName = "test-resource"
+
+		ctx := context.Background()
+
+		typeNamespacedName := types.NamespacedName{
+			Name:      resourceName,
+			Namespace: "default", // TODO(user):Modify as needed
+		}
+		aiscaler := &aiscalerv1.AIScaler{}
+
+		BeforeEach(func() {
+			By("creating the custom resource for the Kind AIScaler")
+			err := k8sClient.Get(ctx, typeNamespacedName, aiscaler)
+			if err != nil && errors.IsNotFound(err) {
+				resource := &aiscalerv1.AIScaler{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      resourceName,
+						Namespace: "default",
+					},
+					// TODO(user): Specify other spec details if needed.
+				}
+				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			}
+		})
+
+		AfterEach(func() {
+			// TODO(user): Cleanup logic after each test, like removing the resource instance.
+			resource := &aiscalerv1.AIScaler{}
+			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Cleanup the specific resource instance AIScaler")
+			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+		})
+		It("should successfully reconcile the resource", func() {
+			By("Reconciling the created resource")
+			controllerReconciler := &AIScalerReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
+			// Example: If you expect a certain status condition after reconciliation, verify it here.
+		})
+	})
+})
+
+
+================================================================================
+FILE: internal/controller/suite_test.go
+SIZE: 3.3 KB
+LAST MODIFIED: 2026-03-16 18:26:54
+================================================================================
+
+/*
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package controller
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	aiscalerv1 "github.com/sanjbh/kube-scaling-agent/api/v1"
+	// +kubebuilder:scaffold:imports
+)
+
+// These tests use Ginkgo (BDD-style Go testing framework). Refer to
+// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
+
+var (
+	ctx       context.Context
+	cancel    context.CancelFunc
+	testEnv   *envtest.Environment
+	cfg       *rest.Config
+	k8sClient client.Client
+)
+
+func TestControllers(t *testing.T) {
+	RegisterFailHandler(Fail)
+
+	RunSpecs(t, "Controller Suite")
+}
+
+var _ = BeforeSuite(func() {
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+
+	ctx, cancel = context.WithCancel(context.TODO())
+
+	var err error
+	err = aiscalerv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	// +kubebuilder:scaffold:scheme
+
+	By("bootstrapping test environment")
+	testEnv = &envtest.Environment{
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		ErrorIfCRDPathMissing: true,
+	}
+
+	// Retrieve the first found binary directory to allow running tests from IDEs
+	if getFirstFoundEnvTestBinaryDir() != "" {
+		testEnv.BinaryAssetsDirectory = getFirstFoundEnvTestBinaryDir()
+	}
+
+	// cfg is defined in this file globally.
+	cfg, err = testEnv.Start()
+	Expect(err).NotTo(HaveOccurred())
+	Expect(cfg).NotTo(BeNil())
+
+	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	Expect(err).NotTo(HaveOccurred())
+	Expect(k8sClient).NotTo(BeNil())
+})
+
+var _ = AfterSuite(func() {
+	By("tearing down the test environment")
+	cancel()
+	err := testEnv.Stop()
+	Expect(err).NotTo(HaveOccurred())
+})
+
+// getFirstFoundEnvTestBinaryDir locates the first binary in the specified path.
+// ENVTEST-based tests depend on specific binaries, usually located in paths set by
+// controller-runtime. When running tests directly (e.g., via an IDE) without using
+// Makefile targets, the 'BinaryAssetsDirectory' must be explicitly configured.
+//
+// This function streamlines the process by finding the required binaries, similar to
+// setting the 'KUBEBUILDER_ASSETS' environment variable. To ensure the binaries are
+// properly set up, run 'make setup-envtest' beforehand.
+func getFirstFoundEnvTestBinaryDir() string {
+	basePath := filepath.Join("..", "..", "bin", "k8s")
+	entries, err := os.ReadDir(basePath)
+	if err != nil {
+		logf.Log.Error(err, "Failed to read directory", "path", basePath)
+		return ""
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			return filepath.Join(basePath, entry.Name())
+		}
+	}
+	return ""
+}
+
+
+================================================================================
+FILE: internal/decision/validator.go
+SIZE: 3.7 KB
+LAST MODIFIED: 2026-03-17 14:34:55
+================================================================================
+
+package decision
+
+import (
+	"fmt"
+
+	aiscalerv1 "github.com/sanjbh/kube-scaling-agent/api/v1"
+	"github.com/sanjbh/kube-scaling-agent/internal/llm"
+)
+
+// ValidationResult holds the outcome of a validation pass.
+type ValidationResult struct {
+	// OriginalReplicas is what the LLM suggested before clamping.
+	OriginalReplicas int32
+	// ValidatedReplicas is the safe value after all guardrails applied.
+	ValidatedReplicas int32
+	// Clamped is true if the validator changed the LLM's suggestion.
+	Clamped bool
+	// Reason describes why the value was clamped, if it was.
+	Reason string
+}
+
+// Validator enforces hard scaling constraints regardless of LLM output.
+// It never trusts the LLM blindly — every decision passes through here
+// before being handed to the actuator.
+type Validator struct{}
+
+func NewValidator() *Validator {
+	return &Validator{}
+}
+
+// Validate takes the LLM decision and the AIScaler policy and returns
+// a safe replica count. The order of checks matters:
+//  1. Step size — never move more than maxScaleStep in one cycle
+//  2. Min/max bounds — never go outside the hard limits
+func (v *Validator) Validate(
+	decision *llm.ScalingDecision,
+	current int32,
+	policy *aiscalerv1.AIScaler,
+) *ValidationResult {
+	constraints := policy.Spec.Constraints
+	target := decision.TargetReplicas
+	original := target
+
+	// Step 1: enforce max scale step
+	// Clamp how far we can move from current in one cycle
+	/*
+		Scale up:
+				Say current = 4, maxScaleStep = 3, and the LLM suggests target = 10.
+				delta = target - current
+				delta = 10 - 4 = 6
+				6 > 3 (maxScaleStep) so we clamp:
+				target = current + maxScaleStep
+				target = 4 + 3 = 7
+				We move 3 steps up instead of 6. Next reconcile cycle we'll move another 3, gradually approaching 10.
+
+		Scale down:
+			current = 10, maxScaleStep = 3, LLM suggests target = 2.
+			delta = target - current
+			delta = 2 - 10 = -8
+			-8 < -3 so we clamp:
+			target = current - maxScaleStep
+			target = 10 - 3 = 7
+	*/
+	delta := target - current
+
+	if delta > constraints.MaxScaleStep {
+		target = current + constraints.MaxScaleStep
+	} else if delta < -constraints.MaxScaleStep {
+		target = current - constraints.MaxScaleStep
+	}
+
+	// Step 2: clamp to min/max
+	if target < constraints.MinReplicas {
+		target = constraints.MinReplicas
+	} else if target > constraints.MaxReplicas {
+		target = constraints.MaxReplicas
+	}
+
+	clamped := target != original
+	reason := ""
+	if clamped {
+		reason = buildClampReason(original, target, current, constraints)
+	}
+
+	return &ValidationResult{
+		OriginalReplicas:  original,
+		ValidatedReplicas: target,
+		Clamped:           clamped,
+		Reason:            reason,
+	}
+}
+
+// buildClampReason produces a human-readable explanation of why the
+// validator changed the LLM's suggestion. This gets recorded in the
+// AIScaler status for audit and debugging.
+func buildClampReason(original, validated, current int32, c aiscalerv1.ScalingConstraints) string {
+	delta := original - current
+	switch {
+	case delta > c.MaxScaleStep:
+		return fmt.Sprintf(
+			"LLM suggested %d but step size %d exceeds maxScaleStep %d — clamped to %d",
+			original, delta, c.MaxScaleStep, validated,
+		)
+	case delta < -c.MaxScaleStep:
+		return fmt.Sprintf(
+			"LLM suggested %d but step size %d exceeds maxScaleStep %d — clamped to %d",
+			original, -delta, c.MaxScaleStep, validated,
+		)
+	case original < c.MinReplicas:
+		return fmt.Sprintf(
+			"LLM suggested %d which is below minReplicas %d — clamped to %d",
+			original, c.MinReplicas, validated,
+		)
+	case original > c.MaxReplicas:
+		return fmt.Sprintf(
+			"LLM suggested %d which is above maxReplicas %d — clamped to %d",
+			original, c.MaxReplicas, validated,
+		)
+	default:
+		return fmt.Sprintf("clamped from %d to %d", original, validated)
+	}
+}
+
+
+================================================================================
+FILE: internal/llm/prompt.go
+SIZE: 1.5 KB
+LAST MODIFIED: 2026-03-17 13:57:08
+================================================================================
+
+package llm
+
+import "fmt"
+
+// systemPrompt instructs the LLM on its role and expected output format.
+const systemPrompt = `You are a Kubernetes autoscaling advisor.
+You analyze deployment metrics and decide how many replicas a service should have.
+You must respond with a JSON object only — no markdown, no explanation outside the JSON.
+
+Response format:
+{
+  "target_replicas": <integer>,
+  "reasoning": "<brief explanation>",
+  "confidence": <float 0-1>
+}`
+
+// buildPrompt constructs the user prompt from a ScalingRequest.
+func buildPrompt(req *ScalingRequest) string {
+	userPromptTemplate := `
+Deployment: %s (namespace: %s)
+Current replicas: %d
+Constraints: min=%d, max=%d, max_step=%d
+Deployment healthy: %v
+
+Metrics:
+- CPU utilization: %.1f%%
+- Memory utilization: %.1f%%
+- p95 latency: %.1fms
+- Error rate: %.2f%%
+`
+
+	userPrompt := fmt.Sprintf(userPromptTemplate,
+		req.PolicyName,
+		req.Namespace,
+		req.CurrentReplicas,
+		req.MinReplicas,
+		req.MaxReplicas,
+		req.MaxScaleStep,
+		req.DeploymentReady,
+		req.CPUUtilization,
+		req.MemoryUtilization,
+		req.P95LatencyMs,
+		req.ErrorRate*100)
+
+	if req.ExpectedTraffic != "" {
+		userPrompt += fmt.Sprintf("\nExpected traffic: %s", req.ExpectedTraffic)
+	}
+
+	if req.ScaleConservatively {
+		userPrompt += "\nInstruction: Scale conservatively, prefer fewer replicas."
+	}
+
+	if req.PeakHours != "" {
+		userPrompt += fmt.Sprintf("\nPeak hours: %s", req.PeakHours)
+	}
+
+	if req.Note != "" {
+		userPrompt += fmt.Sprintf("\nOperator note: %s", req.Note)
+	}
+
+	userPrompt += "\n\nWhat should the replica count be?"
+
+	return userPrompt
+
+}
+
+
+================================================================================
+FILE: internal/llm/router.go
+SIZE: 4.4 KB
+LAST MODIFIED: 2026-03-17 14:06:21
+================================================================================
+
+package llm
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	aiscalerv1 "github.com/sanjbh/kube-scaling-agent/api/v1"
+	"github.com/sanjbh/kube-scaling-agent/internal/config"
+	"github.com/sashabaranov/go-openai"
+)
+
+type ScalingRequest struct {
+	PolicyName        string
+	Namespace         string
+	CurrentReplicas   int32
+	MinReplicas       int32
+	MaxReplicas       int32
+	MaxScaleStep      int32
+	CPUUtilization    float64
+	MemoryUtilization float64
+	P95LatencyMs      float64
+	ErrorRate         float64
+	DeploymentReady   bool
+	// Human intent
+	ExpectedTraffic     string
+	ScaleConservatively bool
+	Note                string
+	PeakHours           string
+}
+
+// ScalingDecision is the structured response we parse from the LLM.
+type ScalingDecision struct {
+	TargetReplicas int32   `json:"target_replicas"`
+	Reasoning      string  `json:"reasoning"`
+	Confidence     float64 `json:"confidence"` // 0-1
+}
+
+// Router selects the appropriate LLM provider and handles fallback.
+// All providers are called via the OpenAI-compatible API —
+// no provider-specific SDKs needed.
+type Router struct {
+	cfg *config.Config
+}
+
+// NewRouter creates a Router from the central operator config.
+func NewRouter(cfg *config.Config) *Router {
+	return &Router{cfg: cfg}
+}
+
+// Decide routes the request to the primary provider, falling back
+// to the fallback provider if the primary fails.
+// Returns the decision, the provider that served it, and any error.
+func (r *Router) Decide(
+	ctx context.Context,
+	policy *aiscalerv1.AIScaler,
+	req ScalingRequest,
+) (
+	*ScalingDecision,
+	aiscalerv1.LLMProvider,
+	error) {
+
+	decision, err := r.callProvider(ctx, policy.Spec.LLM.Primary, policy.Spec.LLM.Model, &req)
+	if err == nil {
+		return decision, policy.Spec.LLM.Primary, nil
+	}
+
+	// Primary failed — try fallback if configured
+	if policy.Spec.LLM.Fallback == nil {
+		return nil, "", fmt.Errorf("primary provider %s failed: %w", policy.Spec.LLM.Primary, err)
+	}
+
+	decision, ferr := r.callProvider(ctx, *policy.Spec.LLM.Fallback, policy.Spec.LLM.Model, &req)
+	if ferr != nil {
+		return nil, "", fmt.Errorf(
+			"primary %s failed (%w) and fallback %s also failed: %v",
+			policy.Spec.LLM.Primary, err, *policy.Spec.LLM.Fallback, ferr,
+		)
+	}
+	return decision, *policy.Spec.LLM.Fallback, nil
+}
+
+// callProvider builds an OpenAI-compatible client for the given provider
+// and makes a single chat completion call.
+func (r *Router) callProvider(
+	ctx context.Context,
+	provider aiscalerv1.LLMProvider,
+	modelOverride string,
+	req *ScalingRequest,
+) (*ScalingDecision, error) {
+
+	client, model, err := r.buildClient(provider, modelOverride)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model: model,
+		Messages: []openai.ChatCompletionMessage{
+			{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: systemPrompt,
+			},
+			{
+				Role:    openai.ChatMessageRoleUser,
+				Content: buildPrompt(req),
+			},
+		},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("completion failed for %s: %w", provider, err)
+	}
+
+	if len(res.Choices) == 0 {
+		return nil, fmt.Errorf("empty response from %s", provider)
+	}
+
+	return parseDecision(res.Choices[0].Message.Content)
+}
+
+// buildClient constructs an openai.Client pointed at the correct base URL
+// for the given provider. This is the only place provider differences live.
+func (r *Router) buildClient(
+	provider aiscalerv1.LLMProvider,
+	modelOverride string,
+) (*openai.Client, string, error) {
+
+	settings, err := r.cfg.LLMProvider(string(provider))
+	if err != nil {
+		return nil, "", err
+	}
+
+	apiKey := settings.APIKey
+	if apiKey == "" {
+		apiKey = "unused"
+	}
+
+	model := modelOverride
+
+	if model == "" {
+		model = settings.Model
+	}
+
+	cfg := openai.DefaultConfig(apiKey)
+	cfg.BaseURL = settings.BaseURL
+	return openai.NewClientWithConfig(cfg), model, nil
+}
+
+// parseDecision parses the LLM JSON response into a ScalingDecision.
+// Handles markdown-wrapped JSON defensively since some models wrap
+// their output in ```json fences.
+func parseDecision(raw string) (*ScalingDecision, error) {
+	cleaned := strings.TrimSpace(raw)
+	cleaned = strings.TrimPrefix(cleaned, "```json")
+	cleaned = strings.TrimSuffix(cleaned, "```")
+	cleaned = strings.TrimSpace(cleaned)
+
+	var decision ScalingDecision
+
+	if err := json.Unmarshal([]byte(cleaned), &decision); err != nil {
+		return nil, fmt.Errorf("failed to parse LLM response: %w\nraw: %s", err, raw)
+	}
+
+	return &decision, nil
+}
+
+
+================================================================================
+FILE: internal/signals/annotations.go
+SIZE: 1.6 KB
+LAST MODIFIED: 2026-03-17 09:49:06
+================================================================================
+
+package signals
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	aiscalerv1 "github.com/sanjbh/kube-scaling-agent/api/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	annotationExpectedTraffic     = "aiscaler.io/expected-traffic"
+	annotationScaleConservatively = "aiscaler.io/scale-conservatively"
+	annotationFreezeUntil         = "aiscaler.io/freeze-until"
+	annotationNote                = "aiscaler.io/note"
+	annotationPeakHours           = "aiscaler.io/peak-hours"
+)
+
+type annotationCollector struct {
+	client client.Client
+}
+
+func (a *annotationCollector) collect(
+	ctx context.Context,
+	policy *aiscalerv1.AIScaler,
+	bundle *Bundle) error {
+
+	deploy := &appsv1.Deployment{}
+	key := types.NamespacedName{
+		Namespace: policy.Spec.TargetRef.Namespace,
+		Name:      policy.Spec.TargetRef.Name,
+	}
+
+	if err := a.client.Get(ctx, key, deploy); err != nil {
+		return fmt.Errorf(
+			"failed to get deployment %s/%s: %w",
+			policy.Spec.TargetRef.Namespace,
+			policy.Spec.TargetRef.Name,
+			err,
+		)
+	}
+
+	ann := deploy.GetAnnotations()
+	if ann == nil {
+		return nil
+	}
+
+	bundle.Annotations.ExpectedTraffic = ann[annotationExpectedTraffic]
+	bundle.Annotations.ScaleConservatively = ann[annotationScaleConservatively] == "true"
+	bundle.Annotations.Note = ann[annotationNote]
+	bundle.Annotations.PeakHours = ann[annotationPeakHours]
+
+	if raw, ok := ann[annotationFreezeUntil]; ok {
+		freezeUntil, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return fmt.Errorf("invalid freeze-until timestamp %q: %w", raw, err)
+		}
+		bundle.Annotations.FreezeUntil = &freezeUntil
+	}
+
+	return nil
+}
+
+
+================================================================================
+FILE: internal/signals/collector.go
+SIZE: 2.4 KB
+LAST MODIFIED: 2026-03-18 12:12:30
+================================================================================
+
+package signals
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	aiscalerv1 "github.com/sanjbh/kube-scaling-agent/api/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+// Bundle holds all signals collected for a single reconcile cycle.
+// This is what gets passed to the LLM router as context.
+type Bundle struct {
+	// From metrics server
+	CPUUtilization    float64 // percentage 0-100
+	MemoryUtilization float64 // percentage 0-100
+
+	// From prometheus
+	P95LatencyMs float64 // p95 request latency in ms
+	ErrorRate    float64 // // error rate as fraction 0-1
+
+	// From Deployment
+	CurrentReplicas int32
+	ReadyReplicas   int32
+	DeploymentReady bool
+
+	// Time context
+	CollectedAt time.Time
+
+	// Human intent from annotations
+	Annotations AnnotationSignals
+}
+
+// AnnotationSignals holds the fixed set of annotations we read from the target Deployment.
+type AnnotationSignals struct {
+	ExpectedTraffic     string // low | normal | high | critical
+	ScaleConservatively bool
+	FreezeUntil         *time.Time
+	Note                string
+	PeakHours           string // HH:MM-HH:MM TZ
+}
+
+// Collector orchestrates all signal fetching for a given AIScaler.
+type Collector struct {
+	metrics     *metricsCollector
+	prometheus  *prometheusCollector
+	annotations *annotationCollector
+}
+
+// NewCollector creates a new Collector.
+func NewCollector(client client.Client) *Collector {
+	return &Collector{
+		metrics:     &metricsCollector{client: client},
+		prometheus:  &prometheusCollector{},
+		annotations: &annotationCollector{client: client},
+	}
+}
+
+// Collect gathers all signals for the given AIScaler and returns a Bundle.
+// Prometheus failures are tolerated — the LLM works with whatever is available.
+// Deployment fetch failures are fatal since replicas and health are core signals.
+func (c *Collector) Collect(ctx context.Context, policy *aiscalerv1.AIScaler) (*Bundle, error) {
+	bundle := &Bundle{
+		CollectedAt: time.Now(),
+	}
+
+	// Deployment health + current replicas — fatal if this fails
+	if err := c.metrics.collect(ctx, policy, bundle); err != nil {
+		return nil, fmt.Errorf("failed to collect metrics: %w", err)
+	}
+
+	// Prometheus signals — non-fatal if Prometheus is unreachable
+	if err := c.prometheus.collect(ctx, policy, bundle); err != nil {
+		fmt.Printf("failed to collect prometheus signals: %v\n", err)
+	}
+
+	// Annotation signals — non-fatal
+	if err := c.annotations.collect(ctx, policy, bundle); err != nil {
+		fmt.Printf("failed to collect annotations: %v\n", err)
+	}
+
+	return bundle, nil
+}
+
+
+================================================================================
+FILE: internal/signals/metrics.go
+SIZE: 3.0 KB
+LAST MODIFIED: 2026-03-18 13:08:18
+================================================================================
+
+package signals
+
+import (
+	"context"
+	"fmt"
+
+	aiscalerv1 "github.com/sanjbh/kube-scaling-agent/api/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+// metricsCollector reads Deployment health and replica counts.
+// CPU/memory utilization will be added once we wire the metrics-server client.
+type metricsCollector struct {
+	client client.Client
+}
+
+func (m *metricsCollector) collect(
+	ctx context.Context,
+	policy *aiscalerv1.AIScaler,
+	bundle *Bundle) error {
+
+	deploy := &appsv1.Deployment{}
+	key := types.NamespacedName{
+		Namespace: policy.Spec.TargetRef.Namespace,
+		Name:      policy.Spec.TargetRef.Name,
+	}
+	if err := m.client.Get(ctx, key, deploy); err != nil {
+		return fmt.Errorf(
+			"failed to get deployment %s/%s: %w",
+			policy.Spec.TargetRef.Namespace,
+			policy.Spec.TargetRef.Name,
+			err,
+		)
+	}
+
+	bundle.CurrentReplicas = deploy.Status.Replicas
+	bundle.ReadyReplicas = deploy.Status.ReadyReplicas
+	bundle.DeploymentReady =
+		deploy.Status.ReadyReplicas == deploy.Status.Replicas && deploy.Status.Replicas > 0
+
+	return nil
+}
+
+// podUtilization computes average CPU and memory utilization across all pods
+// matched by the deployment's selector, as a percentage of their requests.
+func (m *metricsCollector) podUtilization(
+	ctx context.Context,
+	deploy *appsv1.Deployment,
+) (cpuPct, memPct float64, err error) {
+
+	sel, err := labels.ValidatedSelectorFromSet(deploy.Spec.Selector.MatchLabels)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid deployment selector: %w", err)
+	}
+
+	podMetricsList := metricsv1beta1.PodMetricsList{}
+	if err := m.client.List(
+		ctx,
+		&podMetricsList,
+		client.InNamespace(deploy.Namespace),
+		client.MatchingLabelsSelector{Selector: sel},
+	); err != nil {
+		return 0, 0, fmt.Errorf("failed to list pod metrics: %w", err)
+	}
+
+	if len(podMetricsList.Items) == 0 {
+		return 0, 0, nil
+	}
+
+	// Sum resource requests from the pod template spec for % calculation
+	var totalCPUReq, totalMemReq resource.Quantity
+
+	for _, container := range deploy.Spec.Template.Spec.Containers {
+		if req, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
+			totalCPUReq.Add(req)
+		}
+
+		if req, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
+			totalMemReq.Add(req)
+		}
+	}
+
+	var sumCPU, sumMem float64
+
+	for _, item := range podMetricsList.Items {
+		for _, container := range item.Containers {
+			sumCPU += float64(container.Usage.Cpu().Value())
+			sumMem += float64(container.Usage.Memory().Value())
+		}
+	}
+
+	n := float64(len(podMetricsList.Items))
+
+	avgCpu := sumCPU / n
+	avgMem := sumMem / n
+
+	cpuReqMilli := float64(totalCPUReq.MilliValue())
+	memReqBytes := float64(totalMemReq.Value())
+
+	if cpuReqMilli > 0 {
+		cpuPct = avgCpu / cpuReqMilli * 100
+	}
+
+	if memReqBytes > 0 {
+		memPct = avgMem / memReqBytes * 100
+	}
+
+	return cpuPct, memPct, nil
+
+}
+
+
+================================================================================
+FILE: internal/signals/prometheus.go
+SIZE: 2.2 KB
+LAST MODIFIED: 2026-03-16 22:02:13
+================================================================================
+
+package signals
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
+	"time"
+
+	aiscalerv1 "github.com/sanjbh/kube-scaling-agent/api/v1"
+)
+
+type prometheusCollector struct{}
+
+// prometheusResponse is the envelope returned by the Prometheus HTTP API.
+type prometheusResponse struct {
+	Status string `json:"status"`
+	Data   struct {
+		ResultType string `json:"resultType"`
+		Result     []struct {
+			Value [2]interface{} `json:"value"` // [timestamp, value_string]
+		} `json:"result"`
+	} `json:"data"`
+}
+
+func (p *prometheusCollector) collect(
+	ctx context.Context,
+	policy *aiscalerv1.AIScaler,
+	bundle *Bundle) error {
+
+	baseUrl := policy.Spec.Prometheus.BaseURL
+	if baseUrl == "" {
+		return nil
+	}
+
+	if policy.Spec.Prometheus.P95LatencyQuery != "" {
+		val, err := p.query(ctx, baseUrl, policy.Spec.Prometheus.P95LatencyQuery)
+		if err != nil {
+			return fmt.Errorf("failed to query p95 latency: %w", err)
+		}
+		bundle.P95LatencyMs = val
+	}
+
+	if policy.Spec.Prometheus.ErrorRateQuery != "" {
+		val, err := p.query(ctx, baseUrl, policy.Spec.Prometheus.ErrorRateQuery)
+		if err != nil {
+			return fmt.Errorf("failed to query error rate: %w", err)
+		}
+		bundle.ErrorRate = val
+	}
+
+	return nil
+}
+
+func (p *prometheusCollector) query(
+	ctx context.Context,
+	baseUrl string,
+	promql string) (float64, error) {
+
+	endpoint := fmt.Sprintf("%s/api/v1/query", baseUrl)
+	params := url.Values{
+		"query": {promql},
+	}
+
+	httpClient := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+params.Encode(), nil)
+	if err != nil {
+		return 0, err
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	var result prometheusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0, fmt.Errorf("failed to decode prometheus response: %w", err)
+	}
+
+	if result.Status != "success" {
+		return 0, fmt.Errorf("prometheus returned status %q", result.Status)
+	}
+	if len(result.Data.Result) == 0 {
+		return 0, nil
+	}
+
+	raw, ok := result.Data.Result[0].Value[1].(string)
+	if !ok {
+		return 0, fmt.Errorf("unexpected value type in prometheus response")
+	}
+
+	return strconv.ParseFloat(raw, 64)
+}
+
+
+================================================================================
+FILE: test/e2e/e2e_suite_test.go
+SIZE: 3.5 KB
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+//go:build e2e
+// +build e2e
+
+/*
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package e2e
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/sanjbh/kube-scaling-agent/test/utils"
+)
+
+var (
+	// Optional Environment Variables:
+	// - CERT_MANAGER_INSTALL_SKIP=true: Skips CertManager installation during test setup.
+	// These variables are useful if CertManager is already installed, avoiding
+	// re-installation and conflicts.
+	skipCertManagerInstall = os.Getenv("CERT_MANAGER_INSTALL_SKIP") == "true"
+	// isCertManagerAlreadyInstalled will be set true when CertManager CRDs be found on the cluster
+	isCertManagerAlreadyInstalled = false
+
+	// projectImage is the name of the image which will be build and loaded
+	// with the code source changes to be tested.
+	projectImage = "example.com/kube-scaling-agent:v0.0.1"
+)
+
+// TestE2E runs the end-to-end (e2e) test suite for the project. These tests execute in an isolated,
+// temporary environment to validate project changes with the purpose of being used in CI jobs.
+// The default setup requires Kind, builds/loads the Manager Docker image locally, and installs
+// CertManager.
+func TestE2E(t *testing.T) {
+	RegisterFailHandler(Fail)
+	_, _ = fmt.Fprintf(GinkgoWriter, "Starting kube-scaling-agent integration test suite\n")
+	RunSpecs(t, "e2e suite")
+}
+
+var _ = BeforeSuite(func() {
+	By("building the manager(Operator) image")
+	cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectImage))
+	_, err := utils.Run(cmd)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to build the manager(Operator) image")
+
+	// TODO(user): If you want to change the e2e test vendor from Kind, ensure the image is
+	// built and available before running the tests. Also, remove the following block.
+	By("loading the manager(Operator) image on Kind")
+	err = utils.LoadImageToKindClusterWithName(projectImage)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to load the manager(Operator) image into Kind")
+
+	// The tests-e2e are intended to run on a temporary cluster that is created and destroyed for testing.
+	// To prevent errors when tests run in environments with CertManager already installed,
+	// we check for its presence before execution.
+	// Setup CertManager before the suite if not skipped and if not already installed
+	if !skipCertManagerInstall {
+		By("checking if cert manager is installed already")
+		isCertManagerAlreadyInstalled = utils.IsCertManagerCRDsInstalled()
+		if !isCertManagerAlreadyInstalled {
+			_, _ = fmt.Fprintf(GinkgoWriter, "Installing CertManager...\n")
+			Expect(utils.InstallCertManager()).To(Succeed(), "Failed to install CertManager")
+		} else {
+			_, _ = fmt.Fprintf(GinkgoWriter, "WARNING: CertManager is already installed. Skipping installation...\n")
+		}
+	}
+})
+
+var _ = AfterSuite(func() {
+	// Teardown CertManager after the suite if not skipped and if it was not already installed
+	if !skipCertManagerInstall && !isCertManagerAlreadyInstalled {
+		_, _ = fmt.Fprintf(GinkgoWriter, "Uninstalling CertManager...\n")
+		utils.UninstallCertManager()
+	}
+})
+
+
+================================================================================
+FILE: test/e2e/e2e_test.go
+SIZE: 12.0 KB
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+//go:build e2e
+// +build e2e
+
+/*
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package e2e
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/sanjbh/kube-scaling-agent/test/utils"
+)
+
+// namespace where the project is deployed in
+const namespace = "kube-scaling-agent-system"
+
+// serviceAccountName created for the project
+const serviceAccountName = "kube-scaling-agent-controller-manager"
+
+// metricsServiceName is the name of the metrics service of the project
+const metricsServiceName = "kube-scaling-agent-controller-manager-metrics-service"
+
+// metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
+const metricsRoleBindingName = "kube-scaling-agent-metrics-binding"
+
+var _ = Describe("Manager", Ordered, func() {
+	var controllerPodName string
+
+	// Before running the tests, set up the environment by creating the namespace,
+	// enforce the restricted security policy to the namespace, installing CRDs,
+	// and deploying the controller.
+	BeforeAll(func() {
+		By("creating manager namespace")
+		cmd := exec.Command("kubectl", "create", "ns", namespace)
+		_, err := utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to create namespace")
+
+		By("labeling the namespace to enforce the restricted security policy")
+		cmd = exec.Command("kubectl", "label", "--overwrite", "ns", namespace,
+			"pod-security.kubernetes.io/enforce=restricted")
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to label namespace with restricted policy")
+
+		By("installing CRDs")
+		cmd = exec.Command("make", "install")
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to install CRDs")
+
+		By("deploying the controller-manager")
+		cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectImage))
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to deploy the controller-manager")
+	})
+
+	// After all tests have been executed, clean up by undeploying the controller, uninstalling CRDs,
+	// and deleting the namespace.
+	AfterAll(func() {
+		By("cleaning up the curl pod for metrics")
+		cmd := exec.Command("kubectl", "delete", "pod", "curl-metrics", "-n", namespace)
+		_, _ = utils.Run(cmd)
+
+		By("undeploying the controller-manager")
+		cmd = exec.Command("make", "undeploy")
+		_, _ = utils.Run(cmd)
+
+		By("uninstalling CRDs")
+		cmd = exec.Command("make", "uninstall")
+		_, _ = utils.Run(cmd)
+
+		By("removing manager namespace")
+		cmd = exec.Command("kubectl", "delete", "ns", namespace)
+		_, _ = utils.Run(cmd)
+	})
+
+	// After each test, check for failures and collect logs, events,
+	// and pod descriptions for debugging.
+	AfterEach(func() {
+		specReport := CurrentSpecReport()
+		if specReport.Failed() {
+			By("Fetching controller manager pod logs")
+			cmd := exec.Command("kubectl", "logs", controllerPodName, "-n", namespace)
+			controllerLogs, err := utils.Run(cmd)
+			if err == nil {
+				_, _ = fmt.Fprintf(GinkgoWriter, "Controller logs:\n %s", controllerLogs)
+			} else {
+				_, _ = fmt.Fprintf(GinkgoWriter, "Failed to get Controller logs: %s", err)
+			}
+
+			By("Fetching Kubernetes events")
+			cmd = exec.Command("kubectl", "get", "events", "-n", namespace, "--sort-by=.lastTimestamp")
+			eventsOutput, err := utils.Run(cmd)
+			if err == nil {
+				_, _ = fmt.Fprintf(GinkgoWriter, "Kubernetes events:\n%s", eventsOutput)
+			} else {
+				_, _ = fmt.Fprintf(GinkgoWriter, "Failed to get Kubernetes events: %s", err)
+			}
+
+			By("Fetching curl-metrics logs")
+			cmd = exec.Command("kubectl", "logs", "curl-metrics", "-n", namespace)
+			metricsOutput, err := utils.Run(cmd)
+			if err == nil {
+				_, _ = fmt.Fprintf(GinkgoWriter, "Metrics logs:\n %s", metricsOutput)
+			} else {
+				_, _ = fmt.Fprintf(GinkgoWriter, "Failed to get curl-metrics logs: %s", err)
+			}
+
+			By("Fetching controller manager pod description")
+			cmd = exec.Command("kubectl", "describe", "pod", controllerPodName, "-n", namespace)
+			podDescription, err := utils.Run(cmd)
+			if err == nil {
+				fmt.Println("Pod description:\n", podDescription)
+			} else {
+				fmt.Println("Failed to describe controller pod")
+			}
+		}
+	})
+
+	SetDefaultEventuallyTimeout(2 * time.Minute)
+	SetDefaultEventuallyPollingInterval(time.Second)
+
+	Context("Manager", func() {
+		It("should run successfully", func() {
+			By("validating that the controller-manager pod is running as expected")
+			verifyControllerUp := func(g Gomega) {
+				// Get the name of the controller-manager pod
+				cmd := exec.Command("kubectl", "get",
+					"pods", "-l", "control-plane=controller-manager",
+					"-o", "go-template={{ range .items }}"+
+						"{{ if not .metadata.deletionTimestamp }}"+
+						"{{ .metadata.name }}"+
+						"{{ \"\\n\" }}{{ end }}{{ end }}",
+					"-n", namespace,
+				)
+
+				podOutput, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred(), "Failed to retrieve controller-manager pod information")
+				podNames := utils.GetNonEmptyLines(podOutput)
+				g.Expect(podNames).To(HaveLen(1), "expected 1 controller pod running")
+				controllerPodName = podNames[0]
+				g.Expect(controllerPodName).To(ContainSubstring("controller-manager"))
+
+				// Validate the pod's status
+				cmd = exec.Command("kubectl", "get",
+					"pods", controllerPodName, "-o", "jsonpath={.status.phase}",
+					"-n", namespace,
+				)
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("Running"), "Incorrect controller-manager pod status")
+			}
+			Eventually(verifyControllerUp).Should(Succeed())
+		})
+
+		It("should ensure the metrics endpoint is serving metrics", func() {
+			By("creating a ClusterRoleBinding for the service account to allow access to metrics")
+			cmd := exec.Command("kubectl", "create", "clusterrolebinding", metricsRoleBindingName,
+				"--clusterrole=kube-scaling-agent-metrics-reader",
+				fmt.Sprintf("--serviceaccount=%s:%s", namespace, serviceAccountName),
+			)
+			_, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to create ClusterRoleBinding")
+
+			By("validating that the metrics service is available")
+			cmd = exec.Command("kubectl", "get", "service", metricsServiceName, "-n", namespace)
+			_, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Metrics service should exist")
+
+			By("getting the service account token")
+			token, err := serviceAccountToken()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(token).NotTo(BeEmpty())
+
+			By("ensuring the controller pod is ready")
+			verifyControllerPodReady := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "pod", controllerPodName, "-n", namespace,
+					"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("True"), "Controller pod not ready")
+			}
+			Eventually(verifyControllerPodReady, 3*time.Minute, time.Second).Should(Succeed())
+
+			By("verifying that the controller manager is serving the metrics server")
+			verifyMetricsServerStarted := func(g Gomega) {
+				cmd := exec.Command("kubectl", "logs", controllerPodName, "-n", namespace)
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(ContainSubstring("Serving metrics server"),
+					"Metrics server not yet started")
+			}
+			Eventually(verifyMetricsServerStarted, 3*time.Minute, time.Second).Should(Succeed())
+
+			// +kubebuilder:scaffold:e2e-metrics-webhooks-readiness
+
+			By("creating the curl-metrics pod to access the metrics endpoint")
+			cmd = exec.Command("kubectl", "run", "curl-metrics", "--restart=Never",
+				"--namespace", namespace,
+				"--image=curlimages/curl:latest",
+				"--overrides",
+				fmt.Sprintf(`{
+					"spec": {
+						"containers": [{
+							"name": "curl",
+							"image": "curlimages/curl:latest",
+							"command": ["/bin/sh", "-c"],
+							"args": ["curl -v -k -H 'Authorization: Bearer %s' https://%s.%s.svc.cluster.local:8443/metrics"],
+							"securityContext": {
+								"readOnlyRootFilesystem": true,
+								"allowPrivilegeEscalation": false,
+								"capabilities": {
+									"drop": ["ALL"]
+								},
+								"runAsNonRoot": true,
+								"runAsUser": 1000,
+								"seccompProfile": {
+									"type": "RuntimeDefault"
+								}
+							}
+						}],
+						"serviceAccountName": "%s"
+					}
+				}`, token, metricsServiceName, namespace, serviceAccountName))
+			_, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to create curl-metrics pod")
+
+			By("waiting for the curl-metrics pod to complete.")
+			verifyCurlUp := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "pods", "curl-metrics",
+					"-o", "jsonpath={.status.phase}",
+					"-n", namespace)
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("Succeeded"), "curl pod in wrong status")
+			}
+			Eventually(verifyCurlUp, 5*time.Minute).Should(Succeed())
+
+			By("getting the metrics by checking curl-metrics logs")
+			verifyMetricsAvailable := func(g Gomega) {
+				metricsOutput, err := getMetricsOutput()
+				g.Expect(err).NotTo(HaveOccurred(), "Failed to retrieve logs from curl pod")
+				g.Expect(metricsOutput).NotTo(BeEmpty())
+				g.Expect(metricsOutput).To(ContainSubstring("< HTTP/1.1 200 OK"))
+			}
+			Eventually(verifyMetricsAvailable, 2*time.Minute).Should(Succeed())
+		})
+
+		// +kubebuilder:scaffold:e2e-webhooks-checks
+
+		// TODO: Customize the e2e test suite with scenarios specific to your project.
+		// Consider applying sample/CR(s) and check their status and/or verifying
+		// the reconciliation by using the metrics, i.e.:
+		// metricsOutput, err := getMetricsOutput()
+		// Expect(err).NotTo(HaveOccurred(), "Failed to retrieve logs from curl pod")
+		// Expect(metricsOutput).To(ContainSubstring(
+		//    fmt.Sprintf(`controller_runtime_reconcile_total{controller="%s",result="success"} 1`,
+		//    strings.ToLower(<Kind>),
+		// ))
+	})
+})
+
+// serviceAccountToken returns a token for the specified service account in the given namespace.
+// It uses the Kubernetes TokenRequest API to generate a token by directly sending a request
+// and parsing the resulting token from the API response.
+func serviceAccountToken() (string, error) {
+	const tokenRequestRawString = `{
+		"apiVersion": "authentication.k8s.io/v1",
+		"kind": "TokenRequest"
+	}`
+
+	// Temporary file to store the token request
+	secretName := fmt.Sprintf("%s-token-request", serviceAccountName)
+	tokenRequestFile := filepath.Join("/tmp", secretName)
+	err := os.WriteFile(tokenRequestFile, []byte(tokenRequestRawString), os.FileMode(0o644))
+	if err != nil {
+		return "", err
+	}
+
+	var out string
+	verifyTokenCreation := func(g Gomega) {
+		// Execute kubectl command to create the token
+		cmd := exec.Command("kubectl", "create", "--raw", fmt.Sprintf(
+			"/api/v1/namespaces/%s/serviceaccounts/%s/token",
+			namespace,
+			serviceAccountName,
+		), "-f", tokenRequestFile)
+
+		output, err := cmd.CombinedOutput()
+		g.Expect(err).NotTo(HaveOccurred())
+
+		// Parse the JSON output to extract the token
+		var token tokenRequest
+		err = json.Unmarshal(output, &token)
+		g.Expect(err).NotTo(HaveOccurred())
+
+		out = token.Status.Token
+	}
+	Eventually(verifyTokenCreation).Should(Succeed())
+
+	return out, err
+}
+
+// getMetricsOutput retrieves and returns the logs from the curl pod used to access the metrics endpoint.
+func getMetricsOutput() (string, error) {
+	By("getting the curl-metrics logs")
+	cmd := exec.Command("kubectl", "logs", "curl-metrics", "-n", namespace)
+	return utils.Run(cmd)
+}
+
+// tokenRequest is a simplified representation of the Kubernetes TokenRequest API response,
+// containing only the token field that we need to extract.
+type tokenRequest struct {
+	Status struct {
+		Token string `json:"token"`
+	} `json:"status"`
+}
+
+
+================================================================================
+FILE: test/utils/utils.go
+SIZE: 6.2 KB
+LAST MODIFIED: 2026-03-16 18:26:43
+================================================================================
+
+/*
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package utils
+
+import (
+	"bufio"
+	"bytes"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+
+	. "github.com/onsi/ginkgo/v2" // nolint:revive,staticcheck
+)
+
+const (
+	certmanagerVersion = "v1.19.1"
+	certmanagerURLTmpl = "https://github.com/cert-manager/cert-manager/releases/download/%s/cert-manager.yaml"
+
+	defaultKindBinary  = "kind"
+	defaultKindCluster = "kind"
+)
+
+func warnError(err error) {
+	_, _ = fmt.Fprintf(GinkgoWriter, "warning: %v\n", err)
+}
+
+// Run executes the provided command within this context
+func Run(cmd *exec.Cmd) (string, error) {
+	dir, _ := GetProjectDir()
+	cmd.Dir = dir
+
+	if err := os.Chdir(cmd.Dir); err != nil {
+		_, _ = fmt.Fprintf(GinkgoWriter, "chdir dir: %q\n", err)
+	}
+
+	cmd.Env = append(os.Environ(), "GO111MODULE=on")
+	command := strings.Join(cmd.Args, " ")
+	_, _ = fmt.Fprintf(GinkgoWriter, "running: %q\n", command)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(output), fmt.Errorf("%q failed with error %q: %w", command, string(output), err)
+	}
+
+	return string(output), nil
+}
+
+// UninstallCertManager uninstalls the cert manager
+func UninstallCertManager() {
+	url := fmt.Sprintf(certmanagerURLTmpl, certmanagerVersion)
+	cmd := exec.Command("kubectl", "delete", "-f", url)
+	if _, err := Run(cmd); err != nil {
+		warnError(err)
+	}
+
+	// Delete leftover leases in kube-system (not cleaned by default)
+	kubeSystemLeases := []string{
+		"cert-manager-cainjector-leader-election",
+		"cert-manager-controller",
+	}
+	for _, lease := range kubeSystemLeases {
+		cmd = exec.Command("kubectl", "delete", "lease", lease,
+			"-n", "kube-system", "--ignore-not-found", "--force", "--grace-period=0")
+		if _, err := Run(cmd); err != nil {
+			warnError(err)
+		}
+	}
+}
+
+// InstallCertManager installs the cert manager bundle.
+func InstallCertManager() error {
+	url := fmt.Sprintf(certmanagerURLTmpl, certmanagerVersion)
+	cmd := exec.Command("kubectl", "apply", "-f", url)
+	if _, err := Run(cmd); err != nil {
+		return err
+	}
+	// Wait for cert-manager-webhook to be ready, which can take time if cert-manager
+	// was re-installed after uninstalling on a cluster.
+	cmd = exec.Command("kubectl", "wait", "deployment.apps/cert-manager-webhook",
+		"--for", "condition=Available",
+		"--namespace", "cert-manager",
+		"--timeout", "5m",
+	)
+
+	_, err := Run(cmd)
+	return err
+}
+
+// IsCertManagerCRDsInstalled checks if any Cert Manager CRDs are installed
+// by verifying the existence of key CRDs related to Cert Manager.
+func IsCertManagerCRDsInstalled() bool {
+	// List of common Cert Manager CRDs
+	certManagerCRDs := []string{
+		"certificates.cert-manager.io",
+		"issuers.cert-manager.io",
+		"clusterissuers.cert-manager.io",
+		"certificaterequests.cert-manager.io",
+		"orders.acme.cert-manager.io",
+		"challenges.acme.cert-manager.io",
+	}
+
+	// Execute the kubectl command to get all CRDs
+	cmd := exec.Command("kubectl", "get", "crds")
+	output, err := Run(cmd)
+	if err != nil {
+		return false
+	}
+
+	// Check if any of the Cert Manager CRDs are present
+	crdList := GetNonEmptyLines(output)
+	for _, crd := range certManagerCRDs {
+		for _, line := range crdList {
+			if strings.Contains(line, crd) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// LoadImageToKindClusterWithName loads a local docker image to the kind cluster
+func LoadImageToKindClusterWithName(name string) error {
+	cluster := defaultKindCluster
+	if v, ok := os.LookupEnv("KIND_CLUSTER"); ok {
+		cluster = v
+	}
+	kindOptions := []string{"load", "docker-image", name, "--name", cluster}
+	kindBinary := defaultKindBinary
+	if v, ok := os.LookupEnv("KIND"); ok {
+		kindBinary = v
+	}
+	cmd := exec.Command(kindBinary, kindOptions...)
+	_, err := Run(cmd)
+	return err
+}
+
+// GetNonEmptyLines converts given command output string into individual objects
+// according to line breakers, and ignores the empty elements in it.
+func GetNonEmptyLines(output string) []string {
+	var res []string
+	elements := strings.Split(output, "\n")
+	for _, element := range elements {
+		if element != "" {
+			res = append(res, element)
+		}
+	}
+
+	return res
+}
+
+// GetProjectDir will return the directory where the project is
+func GetProjectDir() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return wd, fmt.Errorf("failed to get current working directory: %w", err)
+	}
+	wd = strings.ReplaceAll(wd, "/test/e2e", "")
+	return wd, nil
+}
+
+// UncommentCode searches for target in the file and remove the comment prefix
+// of the target content. The target content may span multiple lines.
+func UncommentCode(filename, target, prefix string) error {
+	// false positive
+	// nolint:gosec
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		return fmt.Errorf("failed to read file %q: %w", filename, err)
+	}
+	strContent := string(content)
+
+	idx := strings.Index(strContent, target)
+	if idx < 0 {
+		return fmt.Errorf("unable to find the code %q to be uncomment", target)
+	}
+
+	out := new(bytes.Buffer)
+	_, err = out.Write(content[:idx])
+	if err != nil {
+		return fmt.Errorf("failed to write to output: %w", err)
+	}
+
+	scanner := bufio.NewScanner(bytes.NewBufferString(target))
+	if !scanner.Scan() {
+		return nil
+	}
+	for {
+		if _, err = out.WriteString(strings.TrimPrefix(scanner.Text(), prefix)); err != nil {
+			return fmt.Errorf("failed to write to output: %w", err)
+		}
+		// Avoid writing a newline in case the previous line was the last in target.
+		if !scanner.Scan() {
+			break
+		}
+		if _, err = out.WriteString("\n"); err != nil {
+			return fmt.Errorf("failed to write to output: %w", err)
+		}
+	}
+
+	if _, err = out.Write(content[idx+len(target):]); err != nil {
+		return fmt.Errorf("failed to write to output: %w", err)
+	}
+
+	// false positive
+	// nolint:gosec
+	if err = os.WriteFile(filename, out.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write file %q: %w", filename, err)
+	}
+
+	return nil
+}
+
+

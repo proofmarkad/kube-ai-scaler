@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- aiscaler_v1_aiscaler.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

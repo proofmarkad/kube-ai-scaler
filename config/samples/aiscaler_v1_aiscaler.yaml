@@ -1,0 +1,9 @@
+apiVersion: aiscaler.aiscaler.io/v1
+kind: AIScaler
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-scaling-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: aiscaler-sample
+spec:
+  # TODO(user): Add fields here
