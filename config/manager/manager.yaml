@@ -63,9 +63,13 @@ spec:
         args:
           - --leader-elect
           - --health-probe-bind-address=:8081
+          - --config=/etc/operator/operator.yaml
         image: controller:latest
         name: manager
         ports: []
+        envFrom:
+        - secretRef:
+            name: operator-api-keys
         securityContext:
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
@@ -93,7 +97,13 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
-        volumeMounts: []
-      volumes: []
+        volumeMounts: 
+        - name: operator-config
+          mountPath: /etc/operator
+          readOnly: true
+      volumes: 
+      - name: operator-config
+        configMap:
+          name: operator-config
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10

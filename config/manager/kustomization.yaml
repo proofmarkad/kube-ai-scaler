@@ -1,2 +1,4 @@
 resources:
 - manager.yaml
+- api-keys-secret.yaml
+- operator-config.yaml

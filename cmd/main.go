@@ -54,6 +54,8 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(aiscalerv1.AddToScheme(scheme))
+
+	// metricsv1beta1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 

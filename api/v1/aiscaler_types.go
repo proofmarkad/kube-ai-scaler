@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -159,4 +161,20 @@ type AIScalerList struct {
 
 func init() {
 	SchemeBuilder.Register(&AIScaler{}, &AIScalerList{})
+}
+
+func (a *AIScalerSpec) ValidateSpec() error {
+	if a.Constraints.MinReplicas > a.Constraints.MaxReplicas {
+		return fmt.Errorf("minReplicas (%d) must be <= maxReplicas (%d)",
+			a.Constraints.MinReplicas, a.Constraints.MaxReplicas)
+	}
+	if a.Constraints.MaxScaleStep > a.Constraints.MaxReplicas {
+		return fmt.Errorf("maxScaleStep (%d) must be <= maxReplicas (%d)",
+			a.Constraints.MaxScaleStep, a.Constraints.MaxReplicas)
+	}
+
+	if a.LLM.Fallback != nil && a.LLM.Primary == *a.LLM.Fallback {
+		return fmt.Errorf("primary and fallback LLMs must be different")
+	}
+	return nil
 }

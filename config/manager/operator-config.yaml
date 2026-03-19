@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: operator-config
+  namespace: system
+data:
+  operator.yaml: |
+    llm:
+      providers:
+        - name: anthropic
+          baseURL: "https://api.anthropic.com/v1"
+          apiKey: "${ANTHROPIC_API_KEY}"
+          model: "claude-sonnet-4-5"
+        - name: gemini
+          baseURL: "https://generativelanguage.googleapis.com/v1beta/openai"
+          apiKey: "${GEMINI_API_KEY}"
+          model: "gemini-2.0-flash"
+        - name: ollama
+          baseURL: "http://localhost:11434/v1"
+          model: "qwen3:8b-q4_K_M"
+        - name: deepseek
+          baseURL: "https://api.deepseek.com/v1"
+          apiKey: "${DEEPSEEK_API_KEY}"
+          model: "deepseek-chat"
+    prometheus:
+      baseURL: "http://prometheus:9090"
+    operator:
+      leaderElection: false
+      metricsBindAddress: ":8080"
+      healthProbeBindAddress: ":8081"

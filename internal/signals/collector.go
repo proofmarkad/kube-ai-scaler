@@ -6,7 +6,9 @@ import (
 	"time"
 
 	aiscalerv1 "github.com/sanjbh/kube-scaling-agent/api/v1"
+	metricsclient "k8s.io/metrics/pkg/client/clientset/versioned"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 // Bundle holds all signals collected for a single reconcile cycle.
@@ -50,8 +52,18 @@ type Collector struct {
 
 // NewCollector creates a new Collector.
 func NewCollector(client client.Client) *Collector {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		panic(fmt.Sprintf("failed to get k8s config: %v", err))
+	}
+
+	metricsClient, err := metricsclient.NewForConfig(cfg)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create metrics client: %v", err))
+	}
+
 	return &Collector{
-		metrics:     &metricsCollector{client: client},
+		metrics:     &metricsCollector{client: client, metricsClient: metricsClient},
 		prometheus:  &prometheusCollector{},
 		annotations: &annotationCollector{client: client},
 	}

@@ -49,10 +49,25 @@ func (a *Actuator) Apply(
 	policy *aiscalerv1.AIScaler,
 	result *decision.ValidationResult,
 ) (*ApplyResult, error) {
-	// Fetch current replica count for the result record
-	currentReplicas, err := a.currentReplicas(ctx, policy)
-	if err != nil {
-		return nil, err
+
+	// Single fetch — used for both current replicas and selector
+	existing := appsv1.Deployment{}
+	key := types.NamespacedName{
+		Namespace: policy.Spec.TargetRef.Namespace,
+		Name:      policy.Spec.TargetRef.Name,
+	}
+
+	if err := a.client.Get(ctx, key, &existing); err != nil {
+		return nil, fmt.Errorf("failed to get deployment %s/%s: %w",
+			policy.Spec.TargetRef.Namespace,
+			policy.Spec.TargetRef.Name,
+			err,
+		)
+	}
+
+	currentReplicas := int32(1)
+	if existing.Spec.Replicas != nil {
+		currentReplicas = *existing.Spec.Replicas
 	}
 
 	// No-op if replica count is already correct
@@ -77,8 +92,10 @@ func (a *Actuator) Apply(
 			Namespace: policy.Spec.TargetRef.Namespace,
 			Name:      policy.Spec.TargetRef.Name,
 		},
+
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &result.ValidatedReplicas,
+			Selector: existing.Spec.Selector,
 		},
 	}
 

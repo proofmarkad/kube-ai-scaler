@@ -8,16 +8,18 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsclient "k8s.io/metrics/pkg/client/clientset/versioned"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // metricsCollector reads Deployment health and replica counts.
 // CPU/memory utilization will be added once we wire the metrics-server client.
 type metricsCollector struct {
-	client client.Client
+	client        client.Client
+	metricsClient metricsclient.Interface
 }
 
 func (m *metricsCollector) collect(
@@ -44,6 +46,19 @@ func (m *metricsCollector) collect(
 	bundle.DeploymentReady =
 		deploy.Status.ReadyReplicas == deploy.Status.Replicas && deploy.Status.Replicas > 0
 
+	// Collect CPU/memory via metrics-server
+	cpuUtil, memUtil, err := m.podUtilization(ctx, deploy)
+	if err != nil {
+		// Non-fatal — operator still functions, LLM gets 0 for these signals
+		// and the prompt makes clear they are unavailable
+		bundle.CPUUtilization = 0
+		bundle.MemoryUtilization = 0
+		return err
+	}
+
+	bundle.CPUUtilization = cpuUtil
+	bundle.MemoryUtilization = memUtil
+
 	return nil
 }
 
@@ -59,13 +74,11 @@ func (m *metricsCollector) podUtilization(
 		return 0, 0, fmt.Errorf("invalid deployment selector: %w", err)
 	}
 
-	podMetricsList := metricsv1beta1.PodMetricsList{}
-	if err := m.client.List(
-		ctx,
-		&podMetricsList,
-		client.InNamespace(deploy.Namespace),
-		client.MatchingLabelsSelector{Selector: sel},
-	); err != nil {
+	podMetricsList, err := m.metricsClient.
+		MetricsV1beta1().
+		PodMetricses(deploy.Namespace).
+		List(ctx, v1.ListOptions{LabelSelector: sel.String()})
+	if err != nil {
 		return 0, 0, fmt.Errorf("failed to list pod metrics: %w", err)
 	}
 

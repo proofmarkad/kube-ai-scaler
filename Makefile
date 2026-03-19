@@ -108,9 +108,6 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 build: manifests generate fmt vet ## Build manager binary.
 	go build -o bin/manager cmd/main.go
 
-.PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./cmd/main.go
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
@@ -228,6 +225,22 @@ $(ENVTEST): $(LOCALBIN)
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+
+.PHONY: run
+run: manifests generate fmt vet ## Run a controller from your host.
+	go run ./cmd/main.go --config=config/operator.yaml
+
+.PHONY: sample
+sample: ## Apply the sample AIScaler resource.
+	"$(KUBECTL)" apply -f config/samples/aiscaler_v1_aiscaler.yaml
+
+.PHONY: unsample
+unsample: ## Delete the sample AIScaler resource.
+	"$(KUBECTL)" delete --ignore-not-found=$(ignore-not-found) -f config/samples/aiscaler_v1_aiscaler.yaml
+
+.PHONY: dev
+dev: manifests generate fmt vet install ## Install CRDs and run controller locally.
+	go run ./cmd/main.go --config=config/operator.yaml
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary

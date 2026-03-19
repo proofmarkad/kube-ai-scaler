@@ -1,9 +1,24 @@
-apiVersion: aiscaler.aiscaler.io/v1
+apiVersion: aiscaler.io/v1
 kind: AIScaler
 metadata:
-  labels:
-    app.kubernetes.io/name: kube-scaling-agent
-    app.kubernetes.io/managed-by: kustomize
-  name: aiscaler-sample
+  name: nginx-test-scaler
 spec:
-  # TODO(user): Add fields here
+  targetRef:
+    name: nginx-test
+    namespace: default
+
+  constraints:
+    minReplicas: 1
+    maxReplicas: 5
+    maxScaleStep: 2
+
+  llm:
+    primary: ollama
+    model: qwen3:8b-q4_K_M
+
+  prometheus:
+    baseURL: "http://localhost:9090"
+
+  evaluationInterval: 30s
+  cooldownPeriod: 60s
+  dryRun: false

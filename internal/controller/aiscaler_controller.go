@@ -33,6 +33,7 @@ import (
 	"github.com/sanjbh/kube-scaling-agent/internal/llm"
 	"github.com/sanjbh/kube-scaling-agent/internal/signals"
 	appsv1 "k8s.io/api/apps/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -60,7 +61,11 @@ type reconcileState struct {
 
 // StepFunc is a single reconciliation step.
 // A non-nil Result or error short-circuits the chain.
-type StepFunc func(ctx context.Context, state *reconcileState) (*ctrl.Result, error)
+// type StepFunc func(ctx context.Context, state *reconcileState) (*ctrl.Result, error)
+type StepFunc struct {
+	Name string
+	Run  func(ctx context.Context, state *reconcileState) (*ctrl.Result, error)
+}
 
 // +kubebuilder:rbac:groups=aiscaler.io,resources=aiscalers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=aiscaler.io,resources=aiscalers/status,verbs=get;update;patch
@@ -90,23 +95,27 @@ func (r *AIScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	steps := []StepFunc{
-		r.ensureFinalizer,
-		r.checkCooldown,
-		r.collectSignals,
-		r.fetchDecision,
-		r.validateDecision,
-		r.actuate,
-		r.updateStatus,
+		{Name: "ensureFinalizer", Run: r.ensureFinalizer},
+		{Name: "checkCooldown", Run: r.checkCooldown},
+		{Name: "collectSignals", Run: r.collectSignals},
+		{Name: "fetchDecision", Run: r.fetchDecision},
+		{Name: "validateDecision", Run: r.validateDecision},
+		{Name: "actuate", Run: r.actuate},
+		{Name: "updateStatus", Run: r.updateStatus},
 	}
 
 	for _, step := range steps {
-		result, err := step(ctx, state)
+		log.Info("step started", "step", step.Name)
+		result, err := step.Run(ctx, state)
 		if err != nil {
+			log.Error(err, "step failed", "step", step.Name)
 			return ctrl.Result{}, err
 		}
 		if result != nil {
+			log.Info("step short-circuited", "step", step.Name)
 			return *result, nil
 		}
+		log.Info("step completed", "step", step.Name)
 	}
 
 	return ctrl.Result{
@@ -136,6 +145,24 @@ func (r *AIScalerReconciler) ensureFinalizer(ctx context.Context, state *reconci
 
 		result := &ctrl.Result{}
 		return result, nil
+	}
+
+	// Validate spec before doing any real work
+	if err := obj.Spec.ValidateSpec(); err != nil {
+		logf.FromContext(ctx).Error(err, "invalid AIScaler spec")
+		r.setCondition(
+			ctx,
+			obj,
+			aiscalerv1.ConditionReady,
+			metav1.ConditionFalse,
+			"InvalidSpec",
+			err.Error(),
+		)
+		if err := r.Status().Update(ctx, obj); err != nil {
+			return nil, err
+		}
+		// Don't requeue — spec won't fix itself without a user edit
+		return nil, nil
 	}
 
 	// Add finalizer if missing
@@ -222,6 +249,15 @@ func (r *AIScalerReconciler) fetchDecision(
 	log := logf.FromContext(ctx)
 	obj := state.obj
 	b := state.bundle
+
+	// Temporary debug — remove after testing
+	log.Info("signal bundle",
+		"cpu", b.CPUUtilization,
+		"memory", b.MemoryUtilization,
+		"currentReplicas", b.CurrentReplicas,
+		"readyReplicas", b.ReadyReplicas,
+		"deploymentReady", b.DeploymentReady,
+	)
 
 	scalingRequest := llm.ScalingRequest{
 		PolicyName:          obj.Name,
@@ -312,7 +348,7 @@ func (r *AIScalerReconciler) actuate(
 	}
 
 	log.Info(
-		"scaling applied",
+		"Scaling applied",
 		"previous", applyResult.PreviousReplicas,
 		"applied", applyResult.AppliedReplicas,
 	)
@@ -349,6 +385,9 @@ func (r *AIScalerReconciler) updateStatus(
 	)
 
 	if err := r.Status().Update(ctx, obj); err != nil {
+		if apierrors.IsConflict(err) {
+			return &ctrl.Result{Requeue: true}, nil
+		}
 		return nil, fmt.Errorf("failed to update status: %w", err)
 	}
 	return nil, nil
