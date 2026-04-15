@@ -1,0 +1,78 @@
+# Baseline Deployment plus AIScaler example for local Ollama-backed decisions.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: default
+  annotations:
+    aiscaler.io/expected-traffic: normal
+    aiscaler.io/note: Start with baseline LLM scaling and audit the reasoning in status.
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+---
+apiVersion: aiscaler.io/v1
+kind: AIScaler
+metadata:
+  name: web-basic-scaler
+spec:
+  targetRef:
+    name: web
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+
+  constraints:
+    minReplicas: 2
+    maxReplicas: 12
+    maxScaleStep: 3
+    minConfidence: 0.65
+
+  llm:
+    primary: ollama
+    model: qwen3:8b-q4_K_M
+
+  signals:
+    - name: metrics-server
+      required: true
+    - name: annotations
+    - name: prometheus
+      config:
+        baseURL: http://prometheus.monitoring.svc.cluster.local:9090
+        p95LatencyQuery: >-
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace="{{namespace}}",deployment="{{deployment}}"}[5m])) by (le))
+        errorRateQuery: >-
+          sum(rate(http_requests_total{namespace="{{namespace}}",deployment="{{deployment}}",status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total{namespace="{{namespace}}",deployment="{{deployment}}"}[5m])), 1)
+
+  slos:
+    - name: p95-latency
+      metric: p95_latency
+      target: 250
+      priority: 100
+    - name: error-rate
+      metric: error_rate
+      target: 0.02
+      priority: 90
+
+  precedence:
+    reactiveRulesOverrideLLM: true
+    sloAlwaysWins: true
+
+  evaluationInterval: 60s
+  cooldownPeriod: 300s

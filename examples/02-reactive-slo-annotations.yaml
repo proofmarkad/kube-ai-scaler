@@ -1,0 +1,100 @@
+# Reactive rules live on workload annotations. The AIScaler consumes them through the annotations signal plugin.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-api
+  namespace: default
+  annotations:
+    aiscaler.io/expected-traffic: high
+    aiscaler.io/scale-conservatively: "true"
+    aiscaler.io/peak-hours: 09:00-21:00 UTC
+    aiscaler.io/note: Checkout traffic spikes during releases and flash sales.
+    aiscaler.io/reactive-rules: >-
+      [{"metric":"queue_depth","operator":">","threshold":75,"action":"scale_up","amount":3},{"metric":"error_rate","operator":">","threshold":0.03,"action":"set","amount":10}]
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: payments-api
+  template:
+    metadata:
+      labels:
+        app: payments-api
+    spec:
+      containers:
+        - name: api
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: aiscaler.io/v1
+kind: AIScaler
+metadata:
+  name: payments-api-reactive
+spec:
+  targetRef:
+    name: payments-api
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+
+  constraints:
+    minReplicas: 3
+    maxReplicas: 12
+    maxScaleStep: 4
+    minConfidence: 0.55
+
+  llm:
+    primary: ollama
+    model: qwen3:8b-q4_K_M
+
+  signals:
+    - name: metrics-server
+      required: true
+    - name: annotations
+    - name: prometheus
+      config:
+        baseURL: http://prometheus.monitoring.svc.cluster.local:9090
+        p95LatencyQuery: >-
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace="{{namespace}}",deployment="{{deployment}}"}[5m])) by (le))
+        errorRateQuery: >-
+          sum(rate(http_requests_total{namespace="{{namespace}}",deployment="{{deployment}}",status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total{namespace="{{namespace}}",deployment="{{deployment}}"}[5m])), 1)
+        queueDepthQuery: >-
+          sum(kafka_consumergroup_lag{namespace="{{namespace}}",deployment="{{deployment}}"})
+
+  slos:
+    - name: p95-latency
+      metric: p95_latency
+      target: 250
+      priority: 100
+    - name: error-rate
+      metric: error_rate
+      target: 0.02
+      priority: 90
+    - name: queue-depth
+      metric: queue_depth
+      target: 50
+      priority: 80
+
+  precedence:
+    reactiveRulesOverrideLLM: true
+    sloAlwaysWins: true
+
+  alerting:
+    enabled: true
+    rules:
+      - name: queue-backlog
+        condition: queue_depth > 100
+        severity: warning
+        for: 2m
+      - name: high-error-rate
+        condition: error_rate > 5
+        severity: critical
+        for: 2m
+
+  evaluationInterval: 30s
+  cooldownPeriod: 120s

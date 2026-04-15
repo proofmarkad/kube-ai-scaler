@@ -1,0 +1,67 @@
+# External signal example for queue workers on AWS or hybrid environments.
+apiVersion: aiscaler.io/v1
+kind: AIScaler
+metadata:
+  name: queue-worker-aws
+spec:
+  targetRef:
+    name: queue-worker
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+
+  constraints:
+    minReplicas: 1
+    maxReplicas: 40
+    maxScaleStep: 5
+    minConfidence: 0.60
+
+  llm:
+    primary: anthropic
+    apiKeySecret:
+      name: llm-api-keys
+      namespace: default
+      key: anthropic-api-key
+
+  signals:
+    - name: metrics-server
+      required: true
+    - name: annotations
+    - name: aws-sqs
+      config:
+        queueURL: https://sqs.us-east-1.amazonaws.com/123456789012/payments-queue
+        region: us-east-1
+        targetQueueLength: "25"
+    - name: datadog
+      secretRef:
+        name: datadog-credentials
+        namespace: default
+        key: api-key
+      config:
+        site: datadoghq.com
+        query: avg:aws.applicationelb.target_response_time{service:queue-worker,env:prod}
+
+  slos:
+    - name: queue-depth
+      metric: queue_depth
+      target: 25
+      priority: 100
+    - name: upstream-latency
+      metric: datadog_metric
+      target: 0.5
+      priority: 90
+
+  alerting:
+    enabled: true
+    rules:
+      - name: queue-backlog
+        condition: queue_depth > 80
+        severity: warning
+        for: 2m
+      - name: upstream-latency
+        condition: datadog_metric > 0.8
+        severity: critical
+        for: 3m
+
+  evaluationInterval: 30s
+  cooldownPeriod: 120s

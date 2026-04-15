@@ -70,10 +70,14 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 	}
 
-	// Retrieve the first found binary directory to allow running tests from IDEs
-	if getFirstFoundEnvTestBinaryDir() != "" {
-		testEnv.BinaryAssetsDirectory = getFirstFoundEnvTestBinaryDir()
+	binaryAssetsDir := os.Getenv("KUBEBUILDER_ASSETS")
+	if binaryAssetsDir == "" {
+		binaryAssetsDir = getFirstFoundEnvTestBinaryDir()
 	}
+	if binaryAssetsDir == "" {
+		Skip("envtest binaries not found; run make setup-envtest or set KUBEBUILDER_ASSETS")
+	}
+	testEnv.BinaryAssetsDirectory = binaryAssetsDir
 
 	// cfg is defined in this file globally.
 	cfg, err = testEnv.Start()
@@ -87,9 +91,13 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
-	cancel()
-	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
+	if cancel != nil {
+		cancel()
+	}
+	if testEnv != nil {
+		err := testEnv.Stop()
+		Expect(err).NotTo(HaveOccurred())
+	}
 })
 
 // getFirstFoundEnvTestBinaryDir locates the first binary in the specified path.

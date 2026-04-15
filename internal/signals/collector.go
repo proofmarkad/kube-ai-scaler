@@ -9,6 +9,7 @@ import (
 	metricsclient "k8s.io/metrics/pkg/client/clientset/versioned"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // Bundle holds all signals collected for a single reconcile cycle.
@@ -51,22 +52,22 @@ type Collector struct {
 }
 
 // NewCollector creates a new Collector.
-func NewCollector(client client.Client) *Collector {
+func NewCollector(client client.Client) (*Collector, error) {
 	cfg, err := config.GetConfig()
 	if err != nil {
-		panic(fmt.Sprintf("failed to get k8s config: %v", err))
+		return nil, fmt.Errorf("failed to get k8s config: %w", err)
 	}
 
 	metricsClient, err := metricsclient.NewForConfig(cfg)
 	if err != nil {
-		panic(fmt.Sprintf("failed to create metrics client: %v", err))
+		return nil, fmt.Errorf("failed to create metrics client: %w", err)
 	}
 
 	return &Collector{
 		metrics:     &metricsCollector{client: client, metricsClient: metricsClient},
 		prometheus:  &prometheusCollector{},
 		annotations: &annotationCollector{client: client},
-	}
+	}, nil
 }
 
 // Collect gathers all signals for the given AIScaler and returns a Bundle.
@@ -84,12 +85,12 @@ func (c *Collector) Collect(ctx context.Context, policy *aiscalerv1.AIScaler) (*
 
 	// Prometheus signals — non-fatal if Prometheus is unreachable
 	if err := c.prometheus.collect(ctx, policy, bundle); err != nil {
-		fmt.Printf("failed to collect prometheus signals: %v\n", err)
+		logf.FromContext(ctx).Info("failed to collect prometheus signals", "error", err)
 	}
 
 	// Annotation signals — non-fatal
 	if err := c.annotations.collect(ctx, policy, bundle); err != nil {
-		fmt.Printf("failed to collect annotations: %v\n", err)
+		logf.FromContext(ctx).Info("failed to collect annotations", "error", err)
 	}
 
 	return bundle, nil

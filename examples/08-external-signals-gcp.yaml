@@ -1,0 +1,64 @@
+# GKE example using Pub/Sub backlog and Cloud Monitoring latency.
+apiVersion: aiscaler.io/v1
+kind: AIScaler
+metadata:
+  name: pubsub-worker-gcp
+spec:
+  targetRef:
+    name: pubsub-worker
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+
+  constraints:
+    minReplicas: 1
+    maxReplicas: 30
+    maxScaleStep: 4
+    minConfidence: 0.65
+
+  llm:
+    primary: gemini
+    apiKeySecret:
+      name: llm-api-keys
+      namespace: default
+      key: gemini-api-key
+
+  signals:
+    - name: metrics-server
+      required: true
+    - name: gcp-pubsub
+      config:
+        projectID: my-gcp-project
+        subscriptionID: orders-events
+        targetDepth: "50"
+    - name: gcp-monitoring
+      config:
+        projectID: my-gcp-project
+        metricType: custom.googleapis.com/orders/p95_latency_seconds
+        signalName: gcp_request_latency
+        filter: 'resource.type="global"'
+
+  slos:
+    - name: queue-depth
+      metric: queue_depth
+      target: 50
+      priority: 100
+    - name: request-latency
+      metric: gcp_request_latency
+      target: 0.4
+      priority: 90
+
+  alerting:
+    enabled: true
+    rules:
+      - name: pubsub-backlog
+        condition: queue_depth > 100
+        severity: warning
+        for: 2m
+      - name: gcp-latency
+        condition: gcp_request_latency > 0.6
+        severity: critical
+        for: 3m
+
+  evaluationInterval: 30s
+  cooldownPeriod: 120s

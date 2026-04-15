@@ -1,3 +1,4 @@
+# Minimal baseline sample. Additional live-wired scenarios are in /examples.
 apiVersion: aiscaler.io/v1
 kind: AIScaler
 metadata:
@@ -6,19 +7,56 @@ spec:
   targetRef:
     name: nginx-test
     namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
 
   constraints:
     minReplicas: 1
-    maxReplicas: 5
+    maxReplicas: 6
     maxScaleStep: 2
+    minConfidence: 0.60
 
   llm:
     primary: ollama
     model: qwen3:8b-q4_K_M
 
-  prometheus:
-    baseURL: "http://localhost:9090"
+  signals:
+    - name: metrics-server
+      required: true
+    - name: annotations
+    - name: prometheus
+      config:
+        baseURL: http://prometheus:9090
+        p95LatencyQuery: >-
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace="{{namespace}}",deployment="{{deployment}}"}[5m])) by (le))
+        errorRateQuery: >-
+          sum(rate(http_requests_total{namespace="{{namespace}}",deployment="{{deployment}}",status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total{namespace="{{namespace}}",deployment="{{deployment}}"}[5m])), 1)
+
+  slos:
+    - name: p95-latency
+      metric: p95_latency
+      target: 250
+      priority: 100
+    - name: error-rate
+      metric: error_rate
+      target: 0.02
+      priority: 90
+
+  precedence:
+    reactiveRulesOverrideLLM: true
+    sloAlwaysWins: true
+
+  alerting:
+    enabled: true
+    rules:
+      - name: sustained-high-latency
+        condition: p95_latency > 400
+        severity: warning
+        for: 3m
+      - name: sustained-error-rate
+        condition: error_rate > 5
+        severity: critical
+        for: 2m
 
   evaluationInterval: 30s
   cooldownPeriod: 60s
-  dryRun: false

@@ -1,0 +1,144 @@
+# Coordination example with two related workloads. Dependency deferral is active when one workload is already scaling.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-api
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: catalog-api
+  template:
+    metadata:
+      labels:
+        app: catalog-api
+    spec:
+      containers:
+        - name: api
+          image: nginx:1.27
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout-api
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: checkout-api
+  template:
+    metadata:
+      labels:
+        app: checkout-api
+    spec:
+      containers:
+        - name: api
+          image: nginx:1.27
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: aiscaler.io/v1
+kind: AIScaler
+metadata:
+  name: catalog-api-scaler
+spec:
+  targetRef:
+    name: catalog-api
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+
+  constraints:
+    minReplicas: 2
+    maxReplicas: 10
+    maxScaleStep: 2
+    minConfidence: 0.60
+
+  llm:
+    primary: ollama
+    model: qwen3:8b-q4_K_M
+
+  signals:
+    - name: metrics-server
+      required: true
+    - name: annotations
+    - name: prometheus
+      config:
+        baseURL: http://prometheus.monitoring.svc.cluster.local:9090
+        p95LatencyQuery: >-
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace="{{namespace}}",deployment="{{deployment}}"}[5m])) by (le))
+        errorRateQuery: >-
+          sum(rate(http_requests_total{namespace="{{namespace}}",deployment="{{deployment}}",status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total{namespace="{{namespace}}",deployment="{{deployment}}"}[5m])), 1)
+
+  slos:
+    - name: p95-latency
+      metric: p95_latency
+      target: 250
+      priority: 100
+
+  evaluationInterval: 45s
+  cooldownPeriod: 180s
+---
+apiVersion: aiscaler.io/v1
+kind: AIScaler
+metadata:
+  name: checkout-api-scaler
+spec:
+  targetRef:
+    name: checkout-api
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+
+  constraints:
+    minReplicas: 2
+    maxReplicas: 12
+    maxScaleStep: 3
+    minConfidence: 0.65
+
+  llm:
+    primary: ollama
+    model: qwen3:8b-q4_K_M
+
+  signals:
+    - name: metrics-server
+      required: true
+    - name: annotations
+    - name: prometheus
+      config:
+        baseURL: http://prometheus.monitoring.svc.cluster.local:9090
+        p95LatencyQuery: >-
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace="{{namespace}}",deployment="{{deployment}}"}[5m])) by (le))
+        errorRateQuery: >-
+          sum(rate(http_requests_total{namespace="{{namespace}}",deployment="{{deployment}}",status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total{namespace="{{namespace}}",deployment="{{deployment}}"}[5m])), 1)
+
+  dependencies:
+    upstreamOf:
+      - name: catalog-api
+        namespace: default
+        kind: Deployment
+        apiVersion: apps/v1
+
+  slos:
+    - name: p95-latency
+      metric: p95_latency
+      target: 220
+      priority: 100
+    - name: error-rate
+      metric: error_rate
+      target: 0.02
+      priority: 90
+
+  precedence:
+    sloAlwaysWins: true
+
+  evaluationInterval: 45s
+  cooldownPeriod: 180s

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"go.yaml.in/yaml/v2"
 )
@@ -16,7 +17,34 @@ type Config struct {
 
 // LLMConfig holds configuration for all LLM providers as a list.
 type LLMConfig struct {
-	Providers []ProviderConfig `yaml:"providers"`
+	Providers               []ProviderConfig `yaml:"providers"`
+	ResponseCacheTTLSeconds int              `yaml:"response_cache_ttl_seconds"`
+	CBThreshold             int              `yaml:"circuit_breaker_threshold"`
+	CBTimeoutSec            int              `yaml:"circuit_breaker_timeout_seconds"`
+}
+
+// CacheTTL returns the response cache TTL duration (defaults to 5m).
+func (c *LLMConfig) CacheTTL() time.Duration {
+	if c.ResponseCacheTTLSeconds > 0 {
+		return time.Duration(c.ResponseCacheTTLSeconds) * time.Second
+	}
+	return 5 * time.Minute
+}
+
+// CircuitBreakerThreshold returns the failure count threshold (defaults to 5).
+func (c *LLMConfig) CircuitBreakerThreshold() int {
+	if c.CBThreshold > 0 {
+		return c.CBThreshold
+	}
+	return 5
+}
+
+// CircuitBreakerTimeout returns the circuit breaker timeout (defaults to 60s).
+func (c *LLMConfig) CircuitBreakerTimeout() time.Duration {
+	if c.CBTimeoutSec > 0 {
+		return time.Duration(c.CBTimeoutSec) * time.Second
+	}
+	return 60 * time.Second
 }
 
 // ProviderConfig holds settings for a single LLM provider entry.
@@ -35,9 +63,30 @@ type PrometheusConfig struct {
 
 // OperatorConfig holds general operator settings.
 type OperatorConfig struct {
-	LeaderElection         bool   `yaml:"leaderElection"`
-	MetricsBindAddress     string `yaml:"metricsBindAddress"`
-	HealthProbeBindAddress string `yaml:"healthProbeBindAddress"`
+	LeaderElection                   bool    `yaml:"leaderElection"`
+	MetricsBindAddress               string  `yaml:"metricsBindAddress"`
+	HealthProbeBindAddress           string  `yaml:"healthProbeBindAddress"`
+	AlertWebhookURL                  string  `yaml:"alertWebhookURL"`
+	AlertWebhookToken                string  `yaml:"alertWebhookToken"`
+	CoordinationMaxConcurrentScaling int     `yaml:"coordinationMaxConcurrentScaling"`
+	CoordinationRequeueSeconds       int     `yaml:"coordinationRequeueSeconds"`
+	ClusterMaxHourlyCost             float64 `yaml:"clusterMaxHourlyCost"`
+}
+
+// CoordinationRequeue returns how long to wait before retrying a deferred coordinated scaling operation.
+func (c *OperatorConfig) CoordinationRequeue() time.Duration {
+	if c.CoordinationRequeueSeconds > 0 {
+		return time.Duration(c.CoordinationRequeueSeconds) * time.Second
+	}
+	return 15 * time.Second
+}
+
+// CoordinationMaxConcurrentScalingLimit returns the cluster concurrency limit for live scaling operations.
+func (c *OperatorConfig) CoordinationMaxConcurrentScalingLimit() int {
+	if c.CoordinationMaxConcurrentScaling > 0 {
+		return c.CoordinationMaxConcurrentScaling
+	}
+	return 0
 }
 
 // Load reads the operator config from the given file path.

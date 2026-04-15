@@ -1,0 +1,97 @@
+# Vertical scaling is applied by patching Deployment pod resources. Feedback summaries are folded back into later prompts.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommender
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: recommender
+  template:
+    metadata:
+      labels:
+        app: recommender
+    spec:
+      containers:
+        - name: recommender
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 400m
+              memory: 768Mi
+            limits:
+              cpu: 800m
+              memory: 1Gi
+---
+apiVersion: aiscaler.io/v1
+kind: AIScaler
+metadata:
+  name: recommender-vertical
+spec:
+  targetRef:
+    name: recommender
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+
+  constraints:
+    minReplicas: 2
+    maxReplicas: 8
+    maxScaleStep: 2
+    minConfidence: 0.65
+
+  llm:
+    primary: gemini
+    apiKeySecret:
+      name: llm-api-keys
+      namespace: default
+      key: gemini-api-key
+
+  signals:
+    - name: metrics-server
+      required: true
+    - name: annotations
+    - name: prometheus
+      config:
+        baseURL: http://prometheus.monitoring.svc.cluster.local:9090
+        p95LatencyQuery: >-
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace="{{namespace}}",deployment="{{deployment}}"}[5m])) by (le))
+        errorRateQuery: >-
+          sum(rate(http_requests_total{namespace="{{namespace}}",deployment="{{deployment}}",status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total{namespace="{{namespace}}",deployment="{{deployment}}"}[5m])), 1)
+
+  verticalScaling:
+    enabled: true
+    resizePolicy: InPlaceOrRecreate
+    constraints:
+      minCPURequest: 250m
+      maxCPURequest: 1500m
+      minMemoryRequest: 512Mi
+      maxMemoryRequest: 3Gi
+      maxCPUStepPercent: 50
+      maxMemoryStepPercent: 50
+
+  feedback:
+    enabled: true
+    evaluationDelay: 10m
+    historyDepth: 25
+    includeInPrompt: 5
+
+  slos:
+    - name: p95-latency
+      metric: p95_latency
+      target: 300
+      priority: 100
+    - name: error-rate
+      metric: error_rate
+      target: 0.02
+      priority: 90
+
+  precedence:
+    sloAlwaysWins: true
+
+  evaluationInterval: 60s
+  cooldownPeriod: 300s

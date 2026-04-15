@@ -55,6 +55,131 @@ spec:
             type: object
           spec:
             properties:
+              alerting:
+                description: Alerting configuration
+                properties:
+                  enabled:
+                    default: true
+                    type: boolean
+                  rules:
+                    description: Custom alert rules
+                    items:
+                      description: AlertRule defines a single alert condition.
+                      properties:
+                        condition:
+                          description: 'Condition expression: "error_rate > 5" or
+                            "p95_latency > 200"'
+                          type: string
+                        for:
+                          default: 2m
+                          description: Duration the condition must hold before firing
+                          type: string
+                        name:
+                          type: string
+                        severity:
+                          enum:
+                          - info
+                          - warning
+                          - critical
+                          type: string
+                      required:
+                      - condition
+                      - name
+                      - severity
+                      type: object
+                    type: array
+                  webhookSecret:
+                    description: Secret containing webhook auth token
+                    properties:
+                      key:
+                        type: string
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    required:
+                    - key
+                    - name
+                    - namespace
+                    type: object
+                  webhookURL:
+                    description: Webhook URL for alert notifications
+                    type: string
+                required:
+                - enabled
+                type: object
+              applicationProfile:
+                description: Application lifecycle profile
+                properties:
+                  coldStartDuration:
+                    type: string
+                  gracefulShutdownDuration:
+                    type: string
+                  warmUpDuration:
+                    type: string
+                type: object
+              approval:
+                description: Human-in-the-loop approval
+                properties:
+                  approvalTimeout:
+                    type: string
+                  autoApproveAfterTimeout:
+                    type: boolean
+                  channels:
+                    items:
+                      description: NotificationChannel defines a channel for notifications.
+                      properties:
+                        endpoint:
+                          description: URL or endpoint
+                          type: string
+                        secretRef:
+                          description: Secret for authentication
+                          properties:
+                            key:
+                              type: string
+                            name:
+                              type: string
+                            namespace:
+                              type: string
+                          required:
+                          - key
+                          - name
+                          - namespace
+                          type: object
+                        type:
+                          enum:
+                          - slack
+                          - pagerduty
+                          - webhook
+                          - email
+                          type: string
+                      required:
+                      - type
+                      type: object
+                    type: array
+                  enabled:
+                    type: boolean
+                  requireApprovalWhen:
+                    items:
+                      description: ApprovalTrigger defines when human approval is
+                        required.
+                      properties:
+                        threshold:
+                          type: number
+                        type:
+                          enum:
+                          - ReplicaChangeExceeds
+                          - CostIncreaseExceeds
+                          - ConfidenceBelow
+                          - Always
+                          type: string
+                      required:
+                      - type
+                      type: object
+                    type: array
+                required:
+                - enabled
+                type: object
               constraints:
                 properties:
                   maxReplicas:
@@ -67,6 +192,11 @@ spec:
                     format: int32
                     minimum: 1
                     type: integer
+                  minConfidence:
+                    default: 0.5
+                    description: Minimum confidence score from LLM to apply scaling
+                      (0-1)
+                    type: number
                   minReplicas:
                     default: 1
                     format: int32
@@ -80,12 +210,165 @@ spec:
               cooldownPeriod:
                 default: 300s
                 type: string
+              cost:
+                description: Cost/FinOps configuration
+                properties:
+                  monthlyBudget:
+                    type: number
+                  openCostURL:
+                    type: string
+                  optimizeForCost:
+                    type: boolean
+                type: object
+              costConstraints:
+                description: Hard cost constraints
+                properties:
+                  currency:
+                    default: USD
+                    type: string
+                  enforcement:
+                    default: soft
+                    enum:
+                    - hard
+                    - soft
+                    type: string
+                  maxHourlyCost:
+                    type: number
+                  maxMonthlyCost:
+                    type: number
+                type: object
+              dependencies:
+                description: Workload dependencies
+                properties:
+                  coscalesWith:
+                    items:
+                      description: CoscaleRef links two workloads that should scale
+                        together.
+                      properties:
+                        ratio:
+                          type: number
+                        targetRef:
+                          properties:
+                            apiVersion:
+                              default: apps/v1
+                              type: string
+                            kind:
+                              default: Deployment
+                              enum:
+                              - Deployment
+                              - StatefulSet
+                              - Rollout
+                              type: string
+                            name:
+                              type: string
+                            namespace:
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          type: object
+                      required:
+                      - targetRef
+                      type: object
+                    type: array
+                  downstreamOf:
+                    items:
+                      properties:
+                        apiVersion:
+                          default: apps/v1
+                          type: string
+                        kind:
+                          default: Deployment
+                          enum:
+                          - Deployment
+                          - StatefulSet
+                          - Rollout
+                          type: string
+                        name:
+                          type: string
+                        namespace:
+                          type: string
+                      required:
+                      - name
+                      - namespace
+                      type: object
+                    type: array
+                  upstreamOf:
+                    items:
+                      properties:
+                        apiVersion:
+                          default: apps/v1
+                          type: string
+                        kind:
+                          default: Deployment
+                          enum:
+                          - Deployment
+                          - StatefulSet
+                          - Rollout
+                          type: string
+                        name:
+                          type: string
+                        namespace:
+                          type: string
+                      required:
+                      - name
+                      - namespace
+                      type: object
+                    type: array
+                type: object
               dryRun:
                 default: false
                 type: boolean
               evaluationInterval:
                 default: 60s
                 type: string
+              feedback:
+                description: Decision feedback loop
+                properties:
+                  enabled:
+                    type: boolean
+                  evaluationDelay:
+                    type: string
+                  historyDepth:
+                    format: int32
+                    type: integer
+                  includeInPrompt:
+                    format: int32
+                    type: integer
+                required:
+                - enabled
+                type: object
+              kedaIntegration:
+                description: KEDA integration
+                properties:
+                  enabled:
+                    type: boolean
+                  mode:
+                    default: advisory
+                    type: string
+                  scaledObjectRef:
+                    properties:
+                      apiVersion:
+                        default: apps/v1
+                        type: string
+                      kind:
+                        default: Deployment
+                        enum:
+                        - Deployment
+                        - StatefulSet
+                        - Rollout
+                        type: string
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    required:
+                    - name
+                    - namespace
+                    type: object
+                required:
+                - enabled
+                type: object
               llm:
                 properties:
                   apiKeySecret:
@@ -101,6 +384,19 @@ spec:
                     - name
                     - namespace
                     type: object
+                  cacheTTL:
+                    default: 30s
+                    description: Response caching TTL. Set to 0 to disable.
+                    type: string
+                  circuitBreakerThreshold:
+                    default: 3
+                    description: 'Circuit breaker: consecutive failures before opening'
+                    format: int32
+                    type: integer
+                  circuitBreakerTimeout:
+                    default: 60s
+                    description: Circuit breaker reset timeout
+                    type: string
                   fallback:
                     enum:
                     - anthropic
@@ -123,7 +419,77 @@ spec:
                 required:
                 - primary
                 type: object
+              llmRateLimit:
+                description: LLM rate limiting
+                properties:
+                  maxCallsPerHour:
+                    format: int32
+                    type: integer
+                  maxCallsPerMinute:
+                    format: int32
+                    type: integer
+                  maxConcurrentCalls:
+                    format: int32
+                    type: integer
+                type: object
+              precedence:
+                description: Decision precedence configuration
+                properties:
+                  costEnforcement:
+                    enum:
+                    - soft
+                    - hard
+                    type: string
+                  logConflicts:
+                    type: boolean
+                  reactiveRulesOverrideLLM:
+                    type: boolean
+                  scheduleOverridesLLM:
+                    type: boolean
+                  sloAlwaysWins:
+                    type: boolean
+                type: object
+              predictiveScaling:
+                description: Predictive scaling configuration
+                properties:
+                  confidenceThreshold:
+                    type: number
+                  enabled:
+                    type: boolean
+                  events:
+                    items:
+                      description: PredictiveEvent defines a known future event affecting
+                        load.
+                      properties:
+                        end:
+                          format: date-time
+                          type: string
+                        expectedLoadMultiplier:
+                          type: number
+                        name:
+                          type: string
+                        preScaleMinutes:
+                          format: int32
+                          type: integer
+                        start:
+                          format: date-time
+                          type: string
+                      required:
+                      - end
+                      - name
+                      - start
+                      type: object
+                    type: array
+                  historyDays:
+                    format: int32
+                    type: integer
+                  lookaheadWindow:
+                    type: string
+                required:
+                - enabled
+                type: object
               prometheus:
+                description: Prometheus config (legacy — prefer using signals[].name=prometheus)
                 properties:
                   baseURL:
                     type: string
@@ -134,8 +500,205 @@ spec:
                 required:
                 - baseURL
                 type: object
+              requireApproval:
+                default: false
+                description: Require human approval for scaling decisions (simple
+                  flag, use Approval for advanced)
+                type: boolean
+              resourceProfiles:
+                description: Resource profiles (time-based resource configurations)
+                items:
+                  description: ResourceProfile defines a named resource profile with
+                    an optional schedule.
+                  properties:
+                    name:
+                      type: string
+                    resources:
+                      description: ResourceSet defines a set of resource requests.
+                      properties:
+                        cpuRequest:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        memoryRequest:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                      type: object
+                    schedule:
+                      type: string
+                  required:
+                  - name
+                  - resources
+                  type: object
+                type: array
+              safety:
+                description: Safety guardrails
+                properties:
+                  autoRollback:
+                    description: AutoRollbackConfig configures automatic rollback
+                      on degradation.
+                    properties:
+                      conditions:
+                        items:
+                          type: string
+                        type: array
+                      enabled:
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                  circuitBreaker:
+                    description: CircuitBreakerConfig configures the safety circuit
+                      breaker.
+                    properties:
+                      enabled:
+                        type: boolean
+                      resetAfter:
+                        type: string
+                      tripAfter:
+                        format: int32
+                        type: integer
+                      tripConditions:
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - enabled
+                    type: object
+                  maxReplicaChangePerMinute:
+                    format: int32
+                    type: integer
+                  maxWorkloadsChangedPerMinute:
+                    format: int32
+                    type: integer
+                  scaleDown:
+                    description: DirectionPolicy defines asymmetric scaling constraints
+                      per direction.
+                    properties:
+                      cooldown:
+                        type: string
+                      maxStep:
+                        format: int32
+                        type: integer
+                      requireConfidence:
+                        type: number
+                      requireSLOHeadroom:
+                        type: boolean
+                    type: object
+                  scaleUp:
+                    description: DirectionPolicy defines asymmetric scaling constraints
+                      per direction.
+                    properties:
+                      cooldown:
+                        type: string
+                      maxStep:
+                        format: int32
+                        type: integer
+                      requireConfidence:
+                        type: number
+                      requireSLOHeadroom:
+                        type: boolean
+                    type: object
+                type: object
+              signals:
+                description: Signal sources — each entry enables a signal plugin
+                items:
+                  description: SignalSourceConfig configures a single signal plugin.
+                  properties:
+                    config:
+                      additionalProperties:
+                        type: string
+                      description: Plugin-specific configuration as key-value pairs
+                      type: object
+                    name:
+                      description: Plugin name from the registry (e.g., "prometheus",
+                        "datadog", "aws-sqs")
+                      type: string
+                    required:
+                      default: false
+                      description: Whether this source is required (failure aborts
+                        reconcile)
+                      type: boolean
+                    secretRef:
+                      description: Reference to a Secret for sensitive config (API
+                        keys, tokens)
+                      properties:
+                        key:
+                          type: string
+                        name:
+                          type: string
+                        namespace:
+                          type: string
+                      required:
+                      - key
+                      - name
+                      - namespace
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
+              sloViolationBudget:
+                description: SLO violation budget
+                properties:
+                  maxViolationPercent:
+                    type: number
+                  window:
+                    type: string
+                required:
+                - maxViolationPercent
+                - window
+                type: object
+              slos:
+                description: SLO definitions
+                items:
+                  description: SLO defines a Service Level Objective.
+                  properties:
+                    metric:
+                      type: string
+                    name:
+                      type: string
+                    priority:
+                      format: int32
+                      type: integer
+                    target:
+                      type: number
+                  required:
+                  - metric
+                  - name
+                  - target
+                  type: object
+                type: array
+              statefulSetPolicy:
+                description: StatefulSet-specific policy
+                properties:
+                  drainTimeout:
+                    type: string
+                  pvcRetention:
+                    type: string
+                  scaleDownPolicy:
+                    enum:
+                    - oneAtATime
+                    - maxUnavailable
+                    type: string
+                type: object
               targetRef:
                 properties:
+                  apiVersion:
+                    default: apps/v1
+                    type: string
+                  kind:
+                    default: Deployment
+                    enum:
+                    - Deployment
+                    - StatefulSet
+                    - Rollout
+                    type: string
                   name:
                     type: string
                   namespace:
@@ -144,10 +707,81 @@ spec:
                 - name
                 - namespace
                 type: object
+              tier:
+                description: Workload tier for priority scheduling
+                enum:
+                - critical
+                - standard
+                - best-effort
+                type: string
+              verticalScaling:
+                description: Vertical scaling configuration
+                properties:
+                  constraints:
+                    description: VerticalConstraints defines resource limits for vertical
+                      scaling.
+                    properties:
+                      maxCPURequest:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      maxCPUStepPercent:
+                        format: int32
+                        type: integer
+                      maxMemoryRequest:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      maxMemoryStepPercent:
+                        format: int32
+                        type: integer
+                      minCPURequest:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      minMemoryRequest:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                    type: object
+                  containers:
+                    items:
+                      description: ContainerVerticalConfig configures per-container
+                        vertical scaling.
+                      properties:
+                        enabled:
+                          type: boolean
+                        name:
+                          type: string
+                      required:
+                      - enabled
+                      - name
+                      type: object
+                    type: array
+                  enabled:
+                    type: boolean
+                  resizePolicy:
+                    default: RecommendOnly
+                    enum:
+                    - InPlace
+                    - Recreate
+                    - InPlaceOrRecreate
+                    - RecommendOnly
+                    type: string
+                required:
+                - enabled
+                type: object
             required:
             - constraints
             - llm
-            - prometheus
             - targetRef
             type: object
           status:
@@ -208,12 +842,68 @@ spec:
                   - type
                   type: object
                 type: array
+              cost:
+                description: Cost tracking
+                properties:
+                  budgetUtilization:
+                    type: number
+                  currentHourlyCost:
+                    type: number
+                  currentMonthlyCost:
+                    type: number
+                  wastePercent:
+                    type: number
+                type: object
               currentReplicas:
                 format: int32
                 type: integer
+              currentResources:
+                description: Vertical scaling resource status
+                properties:
+                  cpuLimit:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  cpuRequest:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  lastResizeStrategy:
+                    type: string
+                  lastResizeTime:
+                    format: date-time
+                    type: string
+                  memoryLimit:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  memoryRequest:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                type: object
               desiredReplicas:
                 format: int32
                 type: integer
+              feedback:
+                description: Decision feedback
+                properties:
+                  effectiveRate:
+                    type: number
+                  totalDecisions:
+                    format: int32
+                    type: integer
+                type: object
+              lastDecisionID:
+                type: string
               lastDecisionReason:
                 type: string
               lastProvider:
@@ -226,8 +916,64 @@ spec:
               lastScaleTime:
                 format: date-time
                 type: string
+              llmTelemetry:
+                description: LLM usage telemetry
+                properties:
+                  averageLatencyMs:
+                    type: number
+                  errorRate:
+                    type: number
+                  fallbackRate:
+                    type: number
+                  totalCallsToday:
+                    format: int32
+                    type: integer
+                type: object
               phase:
                 type: string
+              precedence:
+                description: Precedence resolution
+                properties:
+                  activeOverrides:
+                    items:
+                      description: ActiveOverride records an active override.
+                      properties:
+                        expiresAt:
+                          type: string
+                        layer:
+                          type: string
+                      required:
+                      - layer
+                      type: object
+                    type: array
+                  conflicts:
+                    items:
+                      description: PrecedenceConflict records a conflict between decision
+                        layers.
+                      properties:
+                        layer:
+                          type: string
+                        message:
+                          type: string
+                      required:
+                      - layer
+                      - message
+                      type: object
+                    type: array
+                  resolvedReplicas:
+                    format: int32
+                    type: integer
+                type: object
+              prediction:
+                description: Prediction status
+                properties:
+                  confidence:
+                    type: number
+                  predictedCPU30m:
+                    type: number
+                  predictedReplicas30m:
+                    type: number
+                type: object
             type: object
         type: object
     served: true

@@ -1,0 +1,59 @@
+# KEDA advisory example. The signal plugin looks up the live ScaledObject by scaledObjectName.
+apiVersion: aiscaler.io/v1
+kind: AIScaler
+metadata:
+  name: async-worker-keda
+spec:
+  targetRef:
+    name: async-worker
+    namespace: default
+    kind: Deployment
+    apiVersion: apps/v1
+
+  constraints:
+    minReplicas: 1
+    maxReplicas: 30
+    maxScaleStep: 5
+    minConfidence: 0.60
+
+  llm:
+    primary: ollama
+    model: qwen3:8b-q4_K_M
+
+  signals:
+    - name: metrics-server
+      required: true
+    - name: annotations
+    - name: keda
+      config:
+        scaledObjectName: async-worker-queue
+    - name: prometheus
+      config:
+        baseURL: http://prometheus.monitoring.svc.cluster.local:9090
+        queueDepthQuery: >-
+          sum(kafka_consumergroup_lag{namespace="{{namespace}}",deployment="{{deployment}}"})
+
+  kedaIntegration:
+    enabled: true
+    mode: advisory
+
+  slos:
+    - name: queue-depth
+      metric: queue_depth
+      target: 50
+      priority: 100
+
+  precedence:
+    reactiveRulesOverrideLLM: true
+    sloAlwaysWins: true
+
+  alerting:
+    enabled: true
+    rules:
+      - name: queue-backlog
+        condition: queue_depth > 100
+        severity: warning
+        for: 2m
+
+  evaluationInterval: 30s
+  cooldownPeriod: 120s

@@ -2,12 +2,12 @@ llm:
   providers:
     - name: anthropic
       base_url: "https://api.anthropic.com/v1"
-      apiKey: "${ANTHROPIC_API_KEY}"
-      model: "claude-sonnet-4-5"
+      api_key: "${ANTHROPIC_API_KEY}"
+      model: "claude-sonnet-4-5-20250514"
 
     - name: gemini
       base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
-      apiKey: "${GEMINI_API_KEY}"
+      api_key: "${GEMINI_API_KEY}"
       model: "gemini-2.0-flash"
 
     - name: ollama
@@ -16,13 +16,19 @@ llm:
       
     - name: deepseek
       base_url: "https://api.deepseek.com/v1"
-      apiKey: "${DEEPSEEK_API_KEY}"
+      api_key: "${DEEPSEEK_API_KEY}"
       model: "deepseek-chat"
 
 prometheus:
   baseURL: "http://prometheus:9090"
 
 operator:
-  leaderElection: false
+  leaderElection: true
   metricsBindAddress: ":8080"
   healthProbeBindAddress: ":8081"
+  alertWebhookURL: ""
+  alertWebhookToken: ""
+  coordinationMaxConcurrentScaling: 2
+  coordinationRequeueSeconds: 15
+  # Set this to a real cluster budget before enabling budget-based coordination gates.
+  clusterMaxHourlyCost: 0

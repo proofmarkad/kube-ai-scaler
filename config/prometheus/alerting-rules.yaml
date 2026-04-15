@@ -1,0 +1,83 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: aiscaler-alerts
+  namespace: aiscaler-system
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: aiscaler.rules
+      rules:
+        - alert: AIScalerReconcileErrors
+          expr: rate(aiscaler_reconcile_errors_total[5m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "AIScaler {{ $labels.aiscaler }} has reconcile errors"
+            description: "Step {{ $labels.step }} is failing at {{ $value | printf \"%.2f\" }}/s"
+
+        - alert: AIScalerReconcileSlow
+          expr: histogram_quantile(0.95, rate(aiscaler_reconcile_duration_seconds_bucket[5m])) > 30
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "AIScaler reconcile cycles are slow (p95 > 30s)"
+
+        - alert: AIScalerLLMHighErrorRate
+          expr: rate(aiscaler_llm_errors_total[5m]) / (rate(aiscaler_scaling_decisions_total[5m]) + 1) > 0.1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "LLM provider {{ $labels.provider }} error rate > 10%"
+
+        - alert: AIScalerLLMHighLatency
+          expr: histogram_quantile(0.95, rate(aiscaler_llm_latency_seconds_bucket[5m])) > 10
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "LLM provider {{ $labels.provider }} p95 latency > 10s"
+
+        - alert: AIScalerCircuitBreakerOpen
+          expr: aiscaler_circuit_breaker_state == 2
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Circuit breaker for {{ $labels.provider }} is OPEN"
+
+        - alert: AIScalerSignalPluginUnhealthy
+          expr: aiscaler_signal_plugin_healthy == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Signal plugin {{ $labels.plugin }} for {{ $labels.aiscaler }} is unhealthy"
+
+        - alert: AIScalerSLOBreach
+          expr: aiscaler_slo_breach == 1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "SLO {{ $labels.slo_name }} breached for {{ $labels.aiscaler }}"
+
+        - alert: AIScalerFrequentScaling
+          expr: increase(aiscaler_scaling_decisions_total{direction!="none"}[30m]) > 10
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.aiscaler }} scaled {{ $value }} times in 30min - possible flapping"
+
+        - alert: AIScalerHighClampRate
+          expr: rate(aiscaler_validation_clamps_total[1h]) / (rate(aiscaler_scaling_decisions_total[1h]) + 1) > 0.5
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Validator clamping >50% of decisions for {{ $labels.aiscaler }}"

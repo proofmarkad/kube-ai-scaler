@@ -53,7 +53,7 @@ func (m *metricsCollector) collect(
 		// and the prompt makes clear they are unavailable
 		bundle.CPUUtilization = 0
 		bundle.MemoryUtilization = 0
-		return err
+		return nil // non-fatal: metrics-server may be unavailable
 	}
 
 	bundle.CPUUtilization = cpuUtil
@@ -103,7 +103,7 @@ func (m *metricsCollector) podUtilization(
 
 	for _, item := range podMetricsList.Items {
 		for _, container := range item.Containers {
-			sumCPU += float64(container.Usage.Cpu().Value())
+			sumCPU += float64(container.Usage.Cpu().MilliValue())
 			sumMem += float64(container.Usage.Memory().Value())
 		}
 	}
@@ -117,7 +117,7 @@ func (m *metricsCollector) podUtilization(
 	memReqBytes := float64(totalMemReq.Value())
 
 	if cpuReqMilli > 0 {
-		cpuPct = avgCpu / cpuReqMilli * 100
+		cpuPct = avgCpu / cpuReqMilli * 100.0
 	}
 
 	if memReqBytes > 0 {

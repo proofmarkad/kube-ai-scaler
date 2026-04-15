@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -37,11 +38,24 @@ import (
 
 	aiscalerv1 "github.com/sanjbh/kube-scaling-agent/api/v1"
 	"github.com/sanjbh/kube-scaling-agent/internal/actuator"
+	"github.com/sanjbh/kube-scaling-agent/internal/alerting"
+	"github.com/sanjbh/kube-scaling-agent/internal/approval"
+	"github.com/sanjbh/kube-scaling-agent/internal/audit"
 	"github.com/sanjbh/kube-scaling-agent/internal/config"
 	"github.com/sanjbh/kube-scaling-agent/internal/controller"
+	"github.com/sanjbh/kube-scaling-agent/internal/coordinator"
+	"github.com/sanjbh/kube-scaling-agent/internal/cost"
 	"github.com/sanjbh/kube-scaling-agent/internal/decision"
+	"github.com/sanjbh/kube-scaling-agent/internal/feedback"
 	"github.com/sanjbh/kube-scaling-agent/internal/llm"
-	"github.com/sanjbh/kube-scaling-agent/internal/signals"
+	"github.com/sanjbh/kube-scaling-agent/internal/node"
+	"github.com/sanjbh/kube-scaling-agent/internal/notification"
+	"github.com/sanjbh/kube-scaling-agent/internal/prediction"
+	metricsclient "k8s.io/metrics/pkg/client/clientset/versioned"
+
+	// Register built-in and external signal plugins
+	_ "github.com/sanjbh/kube-scaling-agent/internal/plugin/builtin"
+	_ "github.com/sanjbh/kube-scaling-agent/internal/plugin/external"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -96,6 +110,25 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// Load central config before constructing the manager so manager-level settings can override defaults.
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		setupLog.Error(err,
+			"unable to load config",
+			"path", configPath,
+		)
+		os.Exit(1)
+	}
+	if metricsAddr == "0" && cfg.Operator.MetricsBindAddress != "" {
+		metricsAddr = cfg.Operator.MetricsBindAddress
+	}
+	if probeAddr == ":8081" && cfg.Operator.HealthProbeBindAddress != "" {
+		probeAddr = cfg.Operator.HealthProbeBindAddress
+	}
+	if !enableLeaderElection && cfg.Operator.LeaderElection {
+		enableLeaderElection = true
+	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -188,26 +221,83 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Load central config
-	cfg, err := config.Load(configPath)
-	if err != nil {
-		setupLog.Error(err,
-			"unable to load config",
-			"path", configPath,
-		)
-		os.Exit(1)
-	}
-
 	// Wire internal components
 	k8sClient := mgr.GetClient()
 
+	// Create metrics-server client for pod metrics
+	restCfg := ctrl.GetConfigOrDie()
+	metricsCS, err := metricsclient.NewForConfig(restCfg)
+	if err != nil {
+		setupLog.Error(err, "unable to create metrics client")
+		os.Exit(1)
+	}
+
+	// Create LLM cache and router with options
+	llmCache := llm.NewCache(cfg.LLM.CacheTTL())
+	router := llm.NewRouter(cfg,
+		llm.WithK8sClient(k8sClient),
+		llm.WithCache(llmCache),
+		llm.WithCircuitBreaker(cfg.LLM.CircuitBreakerThreshold(), cfg.LLM.CircuitBreakerTimeout()),
+	)
+
+	// Create alerting evaluator
+	alertEvaluator := alerting.NewEvaluator(
+		cfg.Operator.AlertWebhookURL,
+		cfg.Operator.AlertWebhookToken,
+	)
+
+	// Create extended subsystems
+	oscillationDetector := decision.NewOscillationDetector(30*time.Minute, 100)
+	precedenceResolver := decision.NewPrecedenceResolver()
+	rollbackManager := decision.NewRollbackManager()
+	clusterCoordinator := coordinator.NewClusterCoordinator(cfg.Operator.CoordinationMaxConcurrentScalingLimit(), 0)
+	approvalManager := approval.NewManager()
+	costEstimator := cost.NewEstimator()
+	budgetEnforcer := cost.NewBudgetEnforcer()
+	auditStore := audit.NewConfigMapStore(k8sClient, "aiscaler-system", 50)
+	nodeCollector := node.NewCollector(k8sClient)
+	predictor := prediction.NewSeasonalPredictor()
+	feedbackEvaluator := feedback.NewOutcomeEvaluator(auditStore)
+
+	// Cost client — only created if OPENCOST_ENDPOINT is set
+	var costClient *cost.Client
+	if endpoint := os.Getenv("OPENCOST_ENDPOINT"); endpoint != "" {
+		costClient = cost.NewClient(endpoint)
+	}
+
+	// Notification dispatcher — configured from environment
+	var dispatcher *notification.Dispatcher
+	if slackURL := os.Getenv("SLACK_WEBHOOK_URL"); slackURL != "" {
+		slack := notification.NewSlackNotifier(slackURL)
+		dispatcher = notification.NewDispatcher(slack)
+	}
+
 	if err := (&controller.AIScalerReconciler{
-		Client:    k8sClient,
-		Scheme:    mgr.GetScheme(),
-		Collector: signals.NewCollector(k8sClient),
-		Router:    llm.NewRouter(cfg),
-		Validator: decision.NewValidator(),
-		Actuator:  actuator.NewActuator(k8sClient),
+		Client:           k8sClient,
+		Scheme:           mgr.GetScheme(),
+		Router:           router,
+		Validator:        decision.NewValidator(),
+		Actuator:         actuator.NewActuator(k8sClient),
+		VerticalActuator: actuator.NewVerticalActuator(k8sClient),
+		MetricsClient:    metricsCS,
+		Alerting:         alertEvaluator,
+
+		// Extended subsystems
+		OscillationDetector:  oscillationDetector,
+		PrecedenceResolver:   precedenceResolver,
+		RollbackManager:      rollbackManager,
+		Coordinator:          clusterCoordinator,
+		CoordinationRequeue:  cfg.Operator.CoordinationRequeue(),
+		ClusterMaxHourlyCost: cfg.Operator.ClusterMaxHourlyCost,
+		CostClient:           costClient,
+		CostEstimator:        costEstimator,
+		BudgetEnforcer:       budgetEnforcer,
+		AuditStore:           auditStore,
+		ApprovalManager:      approvalManager,
+		Dispatcher:           dispatcher,
+		NodeCollector:        nodeCollector,
+		Predictor:            predictor,
+		FeedbackEvaluator:    feedbackEvaluator,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AIScaler")
 		os.Exit(1)
